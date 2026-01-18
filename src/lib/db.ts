@@ -34,7 +34,7 @@ export async function createMatch(
   input: Omit<MatchRecord, "id" | "createdAt" | "userId">
 ) {
   const pool = getPool();
-  const result = await pool.query<MatchRecord>(
+  const result = await pool.query(
     `
       INSERT INTO matches
         (user_id, date, time, league, home_team, away_team, home_score, away_score)
@@ -68,7 +68,7 @@ export async function createMatch(
 
 export async function listMatches(userId: string) {
   const pool = getPool();
-  const result = await pool.query<MatchRecord>(
+  const result = await pool.query(
     `
       SELECT
         id,
@@ -96,7 +96,7 @@ export async function updateMatch(
   input: Omit<MatchRecord, "id" | "createdAt" | "userId">
 ) {
   const pool = getPool();
-  const result = await pool.query<MatchRecord>(
+  const result = await pool.query(
     `
       UPDATE matches
       SET
@@ -140,15 +140,15 @@ export async function getStats(userId: string) {
   const now = new Date();
   const weekStart = formatDate(startOfWeek(now));
   const monthStart = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  const weekResult = await pool.query<{ count: string }>(
+  const weekResult = await pool.query(
     `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1 AND date >= $2`,
     [userId, weekStart]
   );
-  const monthResult = await pool.query<{ count: string }>(
+  const monthResult = await pool.query(
     `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1 AND date >= $2`,
     [userId, monthStart]
   );
-  const totalResult = await pool.query<{ count: string }>(
+  const totalResult = await pool.query(
     `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1`,
     [userId]
   );
