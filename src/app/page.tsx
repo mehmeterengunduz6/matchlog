@@ -263,20 +263,16 @@ export default function Home() {
     <div className="page">
       <header className="hero">
         <div className="auth-bar">
-          {status === "loading" ? (
-            <span>Checking session...</span>
-          ) : (
-            <div className="auth-info">
-              <span>{session?.user?.name ?? session?.user?.email}</span>
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => signOut()}
-              >
-                Sign out
-              </button>
-            </div>
-          )}
+          <div className="auth-info">
+            <span>{session?.user?.name ?? session?.user?.email}</span>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => signOut()}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
         <div>
           <p className="eyebrow">Matchlog</p>
