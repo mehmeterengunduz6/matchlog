@@ -68,6 +68,19 @@ h3 {
   animation: rise 0.6s ease forwards;
 }
 
+.auth-bar {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 0.9rem;
+  color: #5f584c;
+}
+
+.auth-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .eyebrow {
   text-transform: uppercase;
   font-size: 0.75rem;
@@ -168,6 +181,23 @@ h3 {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.primary-button {
+  padding: 14px 22px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), #1f6b5a);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(32, 79, 67, 0.3);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 28px rgba(32, 79, 67, 0.35);
+}
+
 .ghost-button {
   padding: 10px 14px;
   border-radius: 12px;
@@ -197,6 +227,27 @@ h3 {
 .form-error {
   color: #b6382f;
   font-size: 0.85rem;
+}
+
+.form-note {
+  color: #6d675c;
+  font-size: 0.85rem;
+}
+
+.auth-page {
+  min-height: 100vh;
+  justify-content: center;
+}
+
+.auth-hero {
+  gap: 32px;
+  text-align: left;
+}
+
+.auth-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .log {

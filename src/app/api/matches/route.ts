@@ -1,3 +1,5 @@
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { createMatch, getStats, listMatches, updateMatch } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +22,27 @@ function isValidTime(value: string) {
   return /^\d{2}:\d{2}$/.test(value);
 }
 
+async function requireUserId() {
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  return userId ?? null;
+}
+
 export async function GET() {
-  const matches = listMatches();
-  const stats = getStats();
+  const userId = await requireUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  const matches = await listMatches(userId);
+  const stats = await getStats(userId);
   return Response.json({ matches, stats });
 }
 
 export async function POST(request: Request) {
+  const userId = await requireUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  }
   const body = (await request.json()) as Partial<MatchPayload>;
 
   if (
@@ -63,7 +79,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const match = createMatch({
+  const match = await createMatch(userId, {
     date: body.date,
     time: body.time,
     league,
@@ -77,6 +93,10 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const userId = await requireUserId();
+  if (!userId) {
+    return Response.json({ error: "Unauthorized." }, { status: 401 });
+  }
   const body = (await request.json()) as Partial<MatchPayload> & {
     id?: number;
   };
@@ -116,7 +136,7 @@ export async function PUT(request: Request) {
     );
   }
 
-  const match = updateMatch(body.id, {
+  const match = await updateMatch(userId, body.id, {
     date: body.date,
     time: body.time,
     league,

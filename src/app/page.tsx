@@ -1,9 +1,11 @@
 "use client";
 
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
 type MatchRecord = {
   id: number;
+  userId: string;
   date: string;
   time: string;
   league: string;
@@ -34,7 +36,41 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   month: "short",
   day: "numeric",
+  year: "numeric",
 });
+
+function formatDisplayDate(value: string | Date) {
+  const date =
+    value instanceof Date
+      ? value
+      : value.includes("T")
+      ? new Date(value)
+      : new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return dateFormatter.format(date);
+}
+
+function formatDisplayTime(value: string) {
+  if (!value) {
+    return value;
+  }
+  if (value.includes("T")) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    }
+  }
+  if (value.length >= 5) {
+    return value.slice(0, 5);
+  }
+  return value;
+}
 
 function todayValue() {
   const now = new Date();
@@ -63,6 +99,7 @@ function groupMatches(matches: MatchRecord[]) {
 }
 
 export default function Home() {
+  const { data: session, status } = useSession();
   const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [stats, setStats] = useState<Stats>({
     weekCount: 0,
@@ -84,11 +121,18 @@ export default function Home() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const groupedMatches = useMemo(() => groupMatches(matches), [matches]);
+  const isAuthenticated = status === "authenticated";
 
   async function loadMatches() {
     setLoading(true);
     try {
       const res = await fetch("/api/matches");
+      if (res.status === 401) {
+        setMatches([]);
+        setStats({ weekCount: 0, monthCount: 0, totalCount: 0 });
+        setError("Sign in to see your matches.");
+        return;
+      }
       if (!res.ok) {
         throw new Error("Failed to load matches.");
       }
@@ -104,8 +148,17 @@ export default function Home() {
   }
 
   useEffect(() => {
-    void loadMatches();
-  }, []);
+    if (status === "authenticated") {
+      void loadMatches();
+      return;
+    }
+    if (status === "unauthenticated") {
+      setMatches([]);
+      setStats({ weekCount: 0, monthCount: 0, totalCount: 0 });
+      setError(null);
+      setLoading(false);
+    }
+  }, [status]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,9 +230,54 @@ export default function Home() {
     });
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="page auth-page">
+        <header className="hero auth-hero">
+          <div>
+            <p className="eyebrow">Matchlog</p>
+            <h1>Sign in to keep your match diary.</h1>
+            <p className="hero-copy">
+              Log every match you watch, track weekly and monthly totals, and
+              keep it all private to your account.
+            </p>
+          </div>
+          <div className="auth-cta">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => signIn("google")}
+            >
+              Continue with Google
+            </button>
+            <p className="form-note">
+              Your match log stays tied to your Google account.
+            </p>
+          </div>
+        </header>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <header className="hero">
+        <div className="auth-bar">
+          {status === "loading" ? (
+            <span>Checking session...</span>
+          ) : (
+            <div className="auth-info">
+              <span>{session?.user?.name ?? session?.user?.email}</span>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => signOut()}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
         <div>
           <p className="eyebrow">Matchlog</p>
           <h1>Track every match you watch.</h1>
@@ -214,6 +312,7 @@ export default function Home() {
                 type="date"
                 value={form.date}
                 onChange={(event) => updateForm("date", event.target.value)}
+                disabled={!isAuthenticated}
                 required
               />
             </label>
@@ -223,6 +322,7 @@ export default function Home() {
                 type="time"
                 value={form.time}
                 onChange={(event) => updateForm("time", event.target.value)}
+                disabled={!isAuthenticated}
                 required
               />
             </label>
@@ -233,6 +333,7 @@ export default function Home() {
                 value={form.league}
                 onChange={(event) => updateForm("league", event.target.value)}
                 placeholder="Premier League"
+                disabled={!isAuthenticated}
                 required
               />
             </label>
@@ -243,6 +344,7 @@ export default function Home() {
                 value={form.homeTeam}
                 onChange={(event) => updateForm("homeTeam", event.target.value)}
                 placeholder="Arsenal"
+                disabled={!isAuthenticated}
                 required
               />
             </label>
@@ -253,6 +355,7 @@ export default function Home() {
                 value={form.awayTeam}
                 onChange={(event) => updateForm("awayTeam", event.target.value)}
                 placeholder="Liverpool"
+                disabled={!isAuthenticated}
                 required
               />
             </label>
@@ -263,6 +366,7 @@ export default function Home() {
                 min="0"
                 value={form.homeScore}
                 onChange={(event) => updateForm("homeScore", event.target.value)}
+                disabled={!isAuthenticated}
                 required
               />
             </label>
@@ -273,10 +377,11 @@ export default function Home() {
                 min="0"
                 value={form.awayScore}
                 onChange={(event) => updateForm("awayScore", event.target.value)}
+                disabled={!isAuthenticated}
                 required
               />
             </label>
-            <button type="submit" disabled={submitting}>
+            <button type="submit" disabled={!isAuthenticated || submitting}>
               {submitting
                 ? "Saving..."
                 : editingId
@@ -292,6 +397,9 @@ export default function Home() {
                 Cancel edit
               </button>
             ) : null}
+            {!isAuthenticated ? (
+              <p className="form-note">Sign in to log and edit your matches.</p>
+            ) : null}
             {error ? <p className="form-error">{error}</p> : null}
           </form>
         </section>
@@ -303,6 +411,10 @@ export default function Home() {
           </div>
           {loading ? (
             <p className="empty-state">Loading matches...</p>
+          ) : !isAuthenticated ? (
+            <p className="empty-state">
+              Sign in to see the matches you have logged.
+            </p>
           ) : groupedMatches.length === 0 ? (
             <p className="empty-state">
               No matches yet. Log your first match to get started.
@@ -312,15 +424,15 @@ export default function Home() {
               {groupedMatches.map(([date, items]) => (
                 <div className="log-day" key={date}>
                   <div className="log-date">
-                    <span>
-                      {dateFormatter.format(new Date(`${date}T00:00:00`))}
-                    </span>
+                    <span>{formatDisplayDate(date)}</span>
                     <small>{items.length} match{items.length === 1 ? "" : "es"}</small>
                   </div>
                   <ul>
                     {items.map((match) => (
                       <li key={match.id} className="log-item">
-                        <span className="log-time">{match.time}</span>
+                        <span className="log-time">
+                          {formatDisplayTime(match.time)}
+                        </span>
                         <span className="log-teams">
                           {match.homeTeam} vs {match.awayTeam}
                         </span>

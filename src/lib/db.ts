@@ -1,8 +1,8 @@
-import fs from "fs";
-import path from "path";
+import { getPool } from "@/lib/pool";
 
 export type MatchRecord = {
   id: number;
+  userId: string;
   date: string;
   time: string;
   league: string;
@@ -12,44 +12,6 @@ export type MatchRecord = {
   awayScore: number;
   createdAt: string;
 };
-
-type MatchStore = {
-  lastId: number;
-  matches: MatchRecord[];
-};
-
-const dataDir = path.join(process.cwd(), "data");
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-const dataPath = path.join(dataDir, "matchlog.json");
-
-function loadStore(): MatchStore {
-  if (!fs.existsSync(dataPath)) {
-    const initial: MatchStore = { lastId: 0, matches: [] };
-    fs.writeFileSync(dataPath, JSON.stringify(initial, null, 2));
-    return initial;
-  }
-  const raw = fs.readFileSync(dataPath, "utf-8");
-  const parsed = JSON.parse(raw) as MatchStore;
-  if (!parsed.matches) {
-    return { lastId: 0, matches: [] };
-  }
-  const normalized = parsed.matches.map((match) => ({
-    ...match,
-    league: match.league ?? "",
-  }));
-  const computedLastId =
-    typeof parsed.lastId === "number"
-      ? parsed.lastId
-      : normalized.reduce((max, match) => Math.max(max, match.id ?? 0), 0);
-  return { lastId: computedLastId, matches: normalized };
-}
-
-function saveStore(store: MatchStore) {
-  fs.writeFileSync(dataPath, JSON.stringify(store, null, 2));
-}
 
 function formatDate(date: Date) {
   const year = date.getFullYear();
@@ -67,61 +29,133 @@ function startOfWeek(date: Date) {
   return start;
 }
 
-export function createMatch(input: Omit<MatchRecord, "id" | "createdAt">) {
-  const store = loadStore();
-  const nextId = store.lastId + 1;
-  const createdAt = new Date().toISOString();
-  const record: MatchRecord = { id: nextId, createdAt, ...input };
-  store.lastId = nextId;
-  store.matches.push(record);
-  saveStore(store);
-  return record;
-}
-
-export function listMatches() {
-  const store = loadStore();
-  return store.matches
-    .slice()
-    .sort((a, b) =>
-      a.date === b.date
-        ? a.time === b.time
-          ? b.id - a.id
-          : b.time.localeCompare(a.time)
-        : b.date.localeCompare(a.date)
-    );
-}
-
-export function updateMatch(
-  id: number,
-  input: Omit<MatchRecord, "id" | "createdAt">
+export async function createMatch(
+  userId: string,
+  input: Omit<MatchRecord, "id" | "createdAt" | "userId">
 ) {
-  const store = loadStore();
-  const index = store.matches.findIndex((match) => match.id === id);
-  if (index === -1) {
-    return null;
-  }
-  const existing = store.matches[index];
-  const updated: MatchRecord = {
-    ...existing,
-    ...input,
-  };
-  store.matches[index] = updated;
-  saveStore(store);
-  return updated;
+  const pool = getPool();
+  const result = await pool.query<MatchRecord>(
+    `
+      INSERT INTO matches
+        (user_id, date, time, league, home_team, away_team, home_score, away_score)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING
+        id,
+        user_id as "userId",
+        date,
+        time,
+        league,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        home_score as "homeScore",
+        away_score as "awayScore",
+        created_at as "createdAt"
+    `,
+    [
+      userId,
+      input.date,
+      input.time,
+      input.league,
+      input.homeTeam,
+      input.awayTeam,
+      input.homeScore,
+      input.awayScore,
+    ]
+  );
+  return result.rows[0];
 }
 
-export function getStats() {
+export async function listMatches(userId: string) {
+  const pool = getPool();
+  const result = await pool.query<MatchRecord>(
+    `
+      SELECT
+        id,
+        user_id as "userId",
+        date,
+        time,
+        league,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        home_score as "homeScore",
+        away_score as "awayScore",
+        created_at as "createdAt"
+      FROM matches
+      WHERE user_id = $1
+      ORDER BY date DESC, time DESC, id DESC
+    `,
+    [userId]
+  );
+  return result.rows;
+}
+
+export async function updateMatch(
+  userId: string,
+  id: number,
+  input: Omit<MatchRecord, "id" | "createdAt" | "userId">
+) {
+  const pool = getPool();
+  const result = await pool.query<MatchRecord>(
+    `
+      UPDATE matches
+      SET
+        date = $1,
+        time = $2,
+        league = $3,
+        home_team = $4,
+        away_team = $5,
+        home_score = $6,
+        away_score = $7
+      WHERE id = $8 AND user_id = $9
+      RETURNING
+        id,
+        user_id as "userId",
+        date,
+        time,
+        league,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        home_score as "homeScore",
+        away_score as "awayScore",
+        created_at as "createdAt"
+    `,
+    [
+      input.date,
+      input.time,
+      input.league,
+      input.homeTeam,
+      input.awayTeam,
+      input.homeScore,
+      input.awayScore,
+      id,
+      userId,
+    ]
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function getStats(userId: string) {
+  const pool = getPool();
   const now = new Date();
   const weekStart = formatDate(startOfWeek(now));
   const monthStart = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  const matches = listMatches();
-  const weekCount = matches.filter((match) => match.date >= weekStart).length;
-  const monthCount = matches.filter((match) => match.date >= monthStart).length;
-  const totalCount = matches.length;
+  const weekResult = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1 AND date >= $2`,
+    [userId, weekStart]
+  );
+  const monthResult = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1 AND date >= $2`,
+    [userId, monthStart]
+  );
+  const totalResult = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1`,
+    [userId]
+  );
 
   return {
-    weekCount,
-    monthCount,
-    totalCount,
+    weekCount: Number(weekResult.rows[0]?.count ?? 0),
+    monthCount: Number(monthResult.rows[0]?.count ?? 0),
+    totalCount: Number(totalResult.rows[0]?.count ?? 0),
   };
 }
