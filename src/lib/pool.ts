@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 
-const globalForPg = global as typeof globalThis & { pgPool?: Pool };
+const globalForPg = global as typeof globalThis & { pgPool?: unknown };
 
 const pool =
   globalForPg.pgPool ??
