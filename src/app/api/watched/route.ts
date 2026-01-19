@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { addWatchedEvent, removeWatchedEvent } from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/mobile-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +20,7 @@ function isValidDate(value: string) {
 }
 
 export async function POST(request: Request) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
+  const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -58,8 +56,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
+  const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }

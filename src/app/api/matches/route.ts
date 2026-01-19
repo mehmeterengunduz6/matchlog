@@ -1,6 +1,5 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { createMatch, getStats, listMatches, updateMatch } from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/mobile-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -22,14 +21,8 @@ function isValidTime(value: string) {
   return /^\d{2}:\d{2}$/.test(value);
 }
 
-async function requireUserId() {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
-  return userId ?? null;
-}
-
-export async function GET() {
-  const userId = await requireUserId();
+export async function GET(request: Request) {
+  const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -39,7 +32,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const userId = await requireUserId();
+  const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -93,7 +86,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const userId = await requireUserId();
+  const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }

@@ -1,7 +1,6 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { fetchEventsByDate, FEATURED_LEAGUES } from "@/lib/sportsdb";
 import { getWatchedStats, listWatchedEventIds } from "@/lib/db";
+import { getUserIdFromRequest } from "@/lib/mobile-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +24,7 @@ function groupByLeague(events: Awaited<ReturnType<typeof fetchEventsByDate>>) {
 }
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
+  const userId = await getUserIdFromRequest(request);
   if (!userId) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
