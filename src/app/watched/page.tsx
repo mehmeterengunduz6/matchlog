@@ -164,10 +164,11 @@ export default function WatchedPage() {
         dayCounts.set(dayKey, (dayCounts.get(dayKey) ?? 0) + 1);
       }
 
-      if (event.date >= weekStart) {
+      const dayKey = localDateKey(event.date, event.time, event.createdAt);
+      if (dayKey && dayKey >= weekStart) {
         weekCount += 1;
       }
-      if (event.date >= monthStart) {
+      if (dayKey && dayKey >= monthStart) {
         monthCount += 1;
       }
     });
