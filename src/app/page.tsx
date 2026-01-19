@@ -343,15 +343,14 @@ export default function Home() {
             <p className="empty-state">No fixtures found for this day.</p>
           ) : (
             <div className="league-list">
-              {leagues.map((league) => (
-                <div key={league.id} className="league-group">
-                  <div className="league-header">
-                    <h3>{league.name}</h3>
-                    <span>{league.events.length} matches</span>
-                  </div>
-                  {league.events.length === 0 ? (
-                    <p className="empty-state">No fixtures listed.</p>
-                  ) : (
+              {leagues
+                .filter((league) => league.events.length > 0)
+                .map((league) => (
+                  <div key={league.id} className="league-group">
+                    <div className="league-header">
+                      <h3>{league.name}</h3>
+                      <span>{league.events.length} matches</span>
+                    </div>
                     <ul className="event-list">
                       {league.events.map((event) => {
                         const isWatched = watchedIds.has(event.eventId);
@@ -384,9 +383,8 @@ export default function Home() {
                         );
                       })}
                     </ul>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))}
             </div>
           )}
         </section>
