@@ -348,7 +348,9 @@ export default function Home() {
                       <span>{league.events.length} matches</span>
                     </div>
                     <ul className="event-list">
-                      {league.events.map((event) => {
+                      {[...league.events]
+                        .sort((a, b) => a.time.localeCompare(b.time))
+                        .map((event) => {
                         const isWatched = watchedIds.has(event.eventId);
                         const isPending = pendingIds.has(event.eventId);
                         return (
