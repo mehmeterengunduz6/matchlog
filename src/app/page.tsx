@@ -303,8 +303,8 @@ export default function Home() {
       <main className="content">
         <section className="panel">
           <div className="panel-header">
-            <h2>Pick a day</h2>
-            <p>{formatDisplayDate(selectedDate)}</p>
+            <h2>Pick a day & fixtures</h2>
+            <p>Top 5 leagues + Super Lig + Champions League.</p>
           </div>
           <div className="schedule-controls">
             <label>
@@ -324,19 +324,15 @@ export default function Home() {
             >
               {loading ? "Refreshing..." : "Refresh fixtures"}
             </button>
+            <span className="summary-pill">
+              {formatDisplayDate(selectedDate)}
+            </span>
           </div>
           <div className="summary-row">
             <span>{totalEvents} matches found</span>
             <span>{watchedIds.size} marked watched</span>
           </div>
           {error ? <p className="form-error">{error}</p> : null}
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <h2>Today&apos;s fixtures</h2>
-            <p>Top 5 leagues + Super Lig + Champions League.</p>
-          </div>
           {loading ? (
             <p className="empty-state">Loading fixtures...</p>
           ) : leagues.length === 0 ? (
