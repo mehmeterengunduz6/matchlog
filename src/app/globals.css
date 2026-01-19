@@ -148,6 +148,20 @@ h3 {
   font-size: 0.95rem;
 }
 
+.schedule-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: #5b5548;
+}
+
 .match-form {
   display: grid;
   gap: 14px;
@@ -224,6 +238,21 @@ h3 {
   box-shadow: 0 12px 22px rgba(32, 79, 67, 0.3);
 }
 
+.tag-button {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-strong);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tag-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .form-error {
   color: #b6382f;
   font-size: 0.85rem;
@@ -254,6 +283,68 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.league-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.league-group {
+  padding: 16px;
+  border-radius: 18px;
+  background: #f7f1e7;
+  border: 1px solid #e1dacd;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.league-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #4a4438;
+}
+
+.league-header span {
+  font-size: 0.85rem;
+  color: #7d766b;
+}
+
+.event-list {
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.event-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #eadfce;
+}
+
+.event-time {
+  font-weight: 600;
+  color: var(--accent-strong);
+  font-size: 0.9rem;
+}
+
+.event-teams {
+  font-size: 1rem;
+  margin-top: 2px;
+}
+
+.event-score {
+  font-size: 0.85rem;
+  color: #7b7467;
+  margin-top: 4px;
 }
 
 .log-day {

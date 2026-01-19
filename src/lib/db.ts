@@ -13,6 +13,21 @@ export type MatchRecord = {
   createdAt: string;
 };
 
+export type WatchedEvent = {
+  id: number;
+  userId: string;
+  eventId: string;
+  leagueId: string;
+  leagueName: string;
+  date: string;
+  time: string | null;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  createdAt: string;
+};
+
 function formatDate(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -150,6 +165,103 @@ export async function getStats(userId: string) {
   );
   const totalResult = await pool.query(
     `SELECT COUNT(*)::text as count FROM matches WHERE user_id = $1`,
+    [userId]
+  );
+
+  return {
+    weekCount: Number(weekResult.rows[0]?.count ?? 0),
+    monthCount: Number(monthResult.rows[0]?.count ?? 0),
+    totalCount: Number(totalResult.rows[0]?.count ?? 0),
+  };
+}
+
+export async function listWatchedEventIds(userId: string, date: string) {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      SELECT event_id as "eventId"
+      FROM watched_events
+      WHERE user_id = $1 AND date = $2
+    `,
+    [userId, date]
+  );
+  return result.rows.map((row) => row.eventId as string);
+}
+
+export async function addWatchedEvent(
+  userId: string,
+  input: Omit<WatchedEvent, "id" | "createdAt" | "userId">
+) {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      INSERT INTO watched_events
+        (user_id, event_id, league_id, league_name, date, time, home_team, away_team, home_score, away_score)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ON CONFLICT (user_id, event_id)
+      DO UPDATE SET
+        league_id = EXCLUDED.league_id,
+        league_name = EXCLUDED.league_name,
+        date = EXCLUDED.date,
+        time = EXCLUDED.time,
+        home_team = EXCLUDED.home_team,
+        away_team = EXCLUDED.away_team,
+        home_score = EXCLUDED.home_score,
+        away_score = EXCLUDED.away_score
+      RETURNING
+        id,
+        user_id as "userId",
+        event_id as "eventId",
+        league_id as "leagueId",
+        league_name as "leagueName",
+        date,
+        time,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        home_score as "homeScore",
+        away_score as "awayScore",
+        created_at as "createdAt"
+    `,
+    [
+      userId,
+      input.eventId,
+      input.leagueId,
+      input.leagueName,
+      input.date,
+      input.time,
+      input.homeTeam,
+      input.awayTeam,
+      input.homeScore,
+      input.awayScore,
+    ]
+  );
+  return result.rows[0] as WatchedEvent;
+}
+
+export async function removeWatchedEvent(userId: string, eventId: string) {
+  const pool = getPool();
+  await pool.query(
+    `DELETE FROM watched_events WHERE user_id = $1 AND event_id = $2`,
+    [userId, eventId]
+  );
+}
+
+export async function getWatchedStats(userId: string) {
+  const pool = getPool();
+  const now = new Date();
+  const weekStart = formatDate(startOfWeek(now));
+  const monthStart = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  const weekResult = await pool.query(
+    `SELECT COUNT(*)::text as count FROM watched_events WHERE user_id = $1 AND date >= $2`,
+    [userId, weekStart]
+  );
+  const monthResult = await pool.query(
+    `SELECT COUNT(*)::text as count FROM watched_events WHERE user_id = $1 AND date >= $2`,
+    [userId, monthStart]
+  );
+  const totalResult = await pool.query(
+    `SELECT COUNT(*)::text as count FROM watched_events WHERE user_id = $1`,
     [userId]
   );
 

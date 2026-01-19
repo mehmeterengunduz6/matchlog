@@ -55,3 +55,22 @@ CREATE TABLE IF NOT EXISTS matches (
 
 CREATE INDEX IF NOT EXISTS matches_user_date_idx
   ON matches (user_id, date DESC);
+
+CREATE TABLE IF NOT EXISTS watched_events (
+  id bigserial PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_id text NOT NULL,
+  league_id text NOT NULL,
+  league_name text NOT NULL,
+  date date NOT NULL,
+  time text,
+  home_team text NOT NULL,
+  away_team text NOT NULL,
+  home_score integer,
+  away_score integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (user_id, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS watched_events_user_date_idx
+  ON watched_events (user_id, date DESC);

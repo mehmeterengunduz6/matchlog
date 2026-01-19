@@ -31,4 +31,5 @@ This project does not have automated tests yet. If you add tests, place them nea
 - Postgres is required; configure `DATABASE_URL` for both local and Vercel environments.
 - Google auth requires `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 - Set `NEXTAUTH_SECRET` (required in production) and `NEXTAUTH_URL` for deployed environments.
+- TheSportsDB fixtures use `THESPORTSDB_API_KEY` (free key `123` works for v1 endpoints).
 - Database tables are defined in `db/schema.sql`; apply them before running the app locally or on a new database.

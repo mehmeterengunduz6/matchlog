@@ -3,33 +3,28 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
-type MatchRecord = {
-  id: number;
-  userId: string;
-  date: string;
-  time: string;
-  league: string;
-  homeTeam: string;
-  awayTeam: string;
-  homeScore: number;
-  awayScore: number;
-  createdAt: string;
-};
-
 type Stats = {
   weekCount: number;
   monthCount: number;
   totalCount: number;
 };
 
-type FormState = {
+type EventItem = {
+  eventId: string;
+  leagueId: string;
+  leagueName: string;
   date: string;
   time: string;
-  league: string;
   homeTeam: string;
   awayTeam: string;
-  homeScore: string;
-  awayScore: string;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+type LeagueGroup = {
+  id: string;
+  name: string;
+  events: EventItem[];
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -54,7 +49,7 @@ function formatDisplayDate(value: string | Date) {
 
 function formatDisplayTime(value: string) {
   if (!value) {
-    return value;
+    return "TBD";
   }
   if (value.includes("T")) {
     const date = new Date(value);
@@ -80,64 +75,47 @@ function todayValue() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function timeValue() {
-  const now = new Date();
-  const hh = `${now.getHours()}`.padStart(2, "0");
-  const mm = `${now.getMinutes()}`.padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
-function groupMatches(matches: MatchRecord[]) {
-  const grouped = new Map<string, MatchRecord[]>();
-  matches.forEach((match) => {
-    if (!grouped.has(match.date)) {
-      grouped.set(match.date, []);
-    }
-    grouped.get(match.date)?.push(match);
-  });
-  return Array.from(grouped.entries());
-}
-
 export default function Home() {
   const { data: session, status } = useSession();
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [stats, setStats] = useState<Stats>({
     weekCount: 0,
     monthCount: 0,
     totalCount: 0,
   });
-  const [form, setForm] = useState<FormState>({
-    date: todayValue(),
-    time: timeValue(),
-    league: "",
-    homeTeam: "",
-    awayTeam: "",
-    homeScore: "",
-    awayScore: "",
-  });
-  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(todayValue());
+  const [leagues, setLeagues] = useState<LeagueGroup[]>([]);
+  const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
-  const groupedMatches = useMemo(() => groupMatches(matches), [matches]);
   const isAuthenticated = status === "authenticated";
 
-  async function loadMatches() {
+  const totalEvents = useMemo(
+    () => leagues.reduce((sum, league) => sum + league.events.length, 0),
+    [leagues]
+  );
+
+  async function loadEvents(date: string) {
     setLoading(true);
     try {
-      const res = await fetch("/api/matches");
+      const res = await fetch(`/api/events?date=${date}`);
       if (res.status === 401) {
-        setMatches([]);
-        setStats({ weekCount: 0, monthCount: 0, totalCount: 0 });
-        setError("Sign in to see your matches.");
+        setError("Sign in to see available matches.");
+        setLeagues([]);
+        setWatchedIds(new Set());
         return;
       }
       if (!res.ok) {
-        throw new Error("Failed to load matches.");
+        throw new Error("Failed to load matches for the day.");
       }
-      const data = (await res.json()) as { matches: MatchRecord[]; stats: Stats };
-      setMatches(data.matches);
+      const data = (await res.json()) as {
+        leagues: LeagueGroup[];
+        watchedIds: string[];
+        stats: Stats;
+      };
+      setLeagues(data.leagues);
+      setWatchedIds(new Set(data.watchedIds));
       setStats(data.stats);
       setError(null);
     } catch (err) {
@@ -149,85 +127,63 @@ export default function Home() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      void loadMatches();
-      return;
+      void loadEvents(selectedDate);
     }
-    if (status === "unauthenticated") {
-      setMatches([]);
-      setStats({ weekCount: 0, monthCount: 0, totalCount: 0 });
-      setError(null);
-      setLoading(false);
-    }
-  }, [status]);
+  }, [status, selectedDate]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
+  function setPending(eventId: string, value: boolean) {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      if (value) {
+        next.add(eventId);
+      } else {
+        next.delete(eventId);
+      }
+      return next;
+    });
+  }
+
+  async function toggleWatched(event: EventItem) {
+    const isWatched = watchedIds.has(event.eventId);
+    const optimistic = new Set(watchedIds);
+    if (isWatched) {
+      optimistic.delete(event.eventId);
+    } else {
+      optimistic.add(event.eventId);
+    }
+    setWatchedIds(optimistic);
+    setPending(event.eventId, true);
+
     try {
-      const payload = {
-        date: form.date,
-        time: form.time,
-        league: form.league,
-        homeTeam: form.homeTeam,
-        awayTeam: form.awayTeam,
-        homeScore: Number(form.homeScore),
-        awayScore: Number(form.awayScore),
-      };
-      const res = await fetch("/api/matches", {
-        method: editingId ? "PUT" : "POST",
+      const res = await fetch("/api/watched", {
+        method: isWatched ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingId ? { id: editingId, ...payload } : payload),
+        body: JSON.stringify(
+          isWatched
+            ? { eventId: event.eventId }
+            : {
+                eventId: event.eventId,
+                leagueId: event.leagueId,
+                leagueName: event.leagueName,
+                date: event.date,
+                time: event.time,
+                homeTeam: event.homeTeam,
+                awayTeam: event.awayTeam,
+                homeScore: event.homeScore,
+                awayScore: event.awayScore,
+              }
+        ),
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Failed to save match.");
+        throw new Error("Failed to update watched matches.");
       }
-      await loadMatches();
-      setForm({
-        date: form.date,
-        time: timeValue(),
-        league: "",
-        homeTeam: "",
-        awayTeam: "",
-        homeScore: "",
-        awayScore: "",
-      });
-      setEditingId(null);
+      await loadEvents(selectedDate);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
+      setWatchedIds(new Set(watchedIds));
     } finally {
-      setSubmitting(false);
+      setPending(event.eventId, false);
     }
-  }
-
-  function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function startEdit(match: MatchRecord) {
-    setEditingId(match.id);
-    setForm({
-      date: match.date,
-      time: match.time,
-      league: match.league ?? "",
-      homeTeam: match.homeTeam,
-      awayTeam: match.awayTeam,
-      homeScore: String(match.homeScore),
-      awayScore: String(match.awayScore),
-    });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setForm({
-      date: todayValue(),
-      time: timeValue(),
-      league: "",
-      homeTeam: "",
-      awayTeam: "",
-      homeScore: "",
-      awayScore: "",
-    });
   }
 
   if (!isAuthenticated) {
@@ -238,8 +194,8 @@ export default function Home() {
             <p className="eyebrow">Matchlog</p>
             <h1>Sign in to keep your match diary.</h1>
             <p className="hero-copy">
-              Log every match you watch, track weekly and monthly totals, and
-              keep it all private to your account.
+              Track the matches you watch from the top leagues and keep it all
+              private to your account.
             </p>
           </div>
           <div className="auth-cta">
@@ -276,10 +232,10 @@ export default function Home() {
         </div>
         <div>
           <p className="eyebrow">Matchlog</p>
-          <h1>Track every match you watch.</h1>
+          <h1>Choose the matches you watched.</h1>
           <p className="hero-copy">
-            Log the date, time, teams, and score. See weekly and monthly totals
-            at a glance.
+            We pull the daily fixtures from TheSportsDB. Select what you watched
+            and your weekly/monthly totals update automatically.
           </p>
         </div>
         <div className="stats">
@@ -292,7 +248,7 @@ export default function Home() {
             <strong>{stats.monthCount}</strong>
           </div>
           <div className="stat">
-            <span>Total logged</span>
+            <span>Total watched</span>
             <strong>{stats.totalCount}</strong>
           </div>
         </div>
@@ -300,154 +256,89 @@ export default function Home() {
 
       <main className="content">
         <section className="panel">
-          <h2>{editingId ? "Edit match" : "Log a match"}</h2>
-          <form className="match-form" onSubmit={handleSubmit}>
+          <div className="panel-header">
+            <h2>Pick a day</h2>
+            <p>{formatDisplayDate(selectedDate)}</p>
+          </div>
+          <div className="schedule-controls">
             <label>
               Date
               <input
                 type="date"
-                value={form.date}
-                onChange={(event) => updateForm("date", event.target.value)}
-                disabled={!isAuthenticated}
-                required
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+                max={todayValue()}
               />
             </label>
-            <label>
-              Time
-              <input
-                type="time"
-                value={form.time}
-                onChange={(event) => updateForm("time", event.target.value)}
-                disabled={!isAuthenticated}
-                required
-              />
-            </label>
-            <label>
-              League
-              <input
-                type="text"
-                value={form.league}
-                onChange={(event) => updateForm("league", event.target.value)}
-                placeholder="Premier League"
-                disabled={!isAuthenticated}
-                required
-              />
-            </label>
-            <label>
-              Home team
-              <input
-                type="text"
-                value={form.homeTeam}
-                onChange={(event) => updateForm("homeTeam", event.target.value)}
-                placeholder="Arsenal"
-                disabled={!isAuthenticated}
-                required
-              />
-            </label>
-            <label>
-              Away team
-              <input
-                type="text"
-                value={form.awayTeam}
-                onChange={(event) => updateForm("awayTeam", event.target.value)}
-                placeholder="Liverpool"
-                disabled={!isAuthenticated}
-                required
-              />
-            </label>
-            <label>
-              Home score
-              <input
-                type="number"
-                min="0"
-                value={form.homeScore}
-                onChange={(event) => updateForm("homeScore", event.target.value)}
-                disabled={!isAuthenticated}
-                required
-              />
-            </label>
-            <label>
-              Away score
-              <input
-                type="number"
-                min="0"
-                value={form.awayScore}
-                onChange={(event) => updateForm("awayScore", event.target.value)}
-                disabled={!isAuthenticated}
-                required
-              />
-            </label>
-            <button type="submit" disabled={!isAuthenticated || submitting}>
-              {submitting
-                ? "Saving..."
-                : editingId
-                ? "Save changes"
-                : "Save match"}
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => loadEvents(selectedDate)}
+              disabled={loading}
+            >
+              {loading ? "Refreshing..." : "Refresh fixtures"}
             </button>
-            {editingId ? (
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={cancelEdit}
-              >
-                Cancel edit
-              </button>
-            ) : null}
-            {!isAuthenticated ? (
-              <p className="form-note">Sign in to log and edit your matches.</p>
-            ) : null}
-            {error ? <p className="form-error">{error}</p> : null}
-          </form>
+          </div>
+          <div className="summary-row">
+            <span>{totalEvents} matches found</span>
+            <span>{watchedIds.size} marked watched</span>
+          </div>
+          {error ? <p className="form-error">{error}</p> : null}
         </section>
 
         <section className="panel">
           <div className="panel-header">
-            <h2>Daily log</h2>
-            <p>Matches grouped by date.</p>
+            <h2>Today&apos;s fixtures</h2>
+            <p>Top 5 leagues + Super Lig + Champions League.</p>
           </div>
           {loading ? (
-            <p className="empty-state">Loading matches...</p>
-          ) : !isAuthenticated ? (
-            <p className="empty-state">
-              Sign in to see the matches you have logged.
-            </p>
-          ) : groupedMatches.length === 0 ? (
-            <p className="empty-state">
-              No matches yet. Log your first match to get started.
-            </p>
+            <p className="empty-state">Loading fixtures...</p>
+          ) : leagues.length === 0 ? (
+            <p className="empty-state">No fixtures found for this day.</p>
           ) : (
-            <div className="log">
-              {groupedMatches.map(([date, items]) => (
-                <div className="log-day" key={date}>
-                  <div className="log-date">
-                    <span>{formatDisplayDate(date)}</span>
-                    <small>{items.length} match{items.length === 1 ? "" : "es"}</small>
+            <div className="league-list">
+              {leagues.map((league) => (
+                <div key={league.id} className="league-group">
+                  <div className="league-header">
+                    <h3>{league.name}</h3>
+                    <span>{league.events.length} matches</span>
                   </div>
-                  <ul>
-                    {items.map((match) => (
-                      <li key={match.id} className="log-item">
-                        <span className="log-time">
-                          {formatDisplayTime(match.time)}
-                        </span>
-                        <span className="log-teams">
-                          {match.homeTeam} vs {match.awayTeam}
-                        </span>
-                        <span className="log-league">
-                          {match.league || "League TBD"}
-                        </span>
-                        <span className="log-score">
-                          {match.homeScore} - {match.awayScore}
-                        </span>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() => startEdit(match)}
-                        >
-                          Edit
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  {league.events.length === 0 ? (
+                    <p className="empty-state">No fixtures listed.</p>
+                  ) : (
+                    <ul className="event-list">
+                      {league.events.map((event) => {
+                        const isWatched = watchedIds.has(event.eventId);
+                        const isPending = pendingIds.has(event.eventId);
+                        return (
+                          <li key={event.eventId} className="event-card">
+                            <div>
+                              <p className="event-time">
+                                {formatDisplayTime(event.time)}
+                              </p>
+                              <p className="event-teams">
+                                {event.homeTeam} vs {event.awayTeam}
+                              </p>
+                              <p className="event-score">
+                                {event.homeScore !== null &&
+                                event.awayScore !== null
+                                  ? `${event.homeScore} - ${event.awayScore}`
+                                  : "Score TBD"}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className={isWatched ? "tag-button" : "ghost-button"}
+                              onClick={() => toggleWatched(event)}
+                              disabled={isPending}
+                            >
+                              {isWatched ? "Watched" : "Mark watched"}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
               ))}
             </div>
