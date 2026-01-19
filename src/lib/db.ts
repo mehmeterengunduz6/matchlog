@@ -185,7 +185,7 @@ export async function listWatchedEventIds(userId: string, date: string) {
     `,
     [userId, date]
   );
-  return result.rows.map((row) => row.eventId as string);
+  return result.rows.map((row: { eventId: string }) => row.eventId);
 }
 
 export async function addWatchedEvent(
