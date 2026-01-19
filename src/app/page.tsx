@@ -21,6 +21,12 @@ type EventItem = {
   awayScore: number | null;
 };
 
+type WatchedEvent = EventItem & {
+  id: number;
+  createdAt: string;
+  time: string | null;
+};
+
 type LeagueGroup = {
   id: string;
   name: string;
@@ -85,6 +91,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(todayValue());
   const [leagues, setLeagues] = useState<LeagueGroup[]>([]);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
+  const [watchedEvents, setWatchedEvents] = useState<WatchedEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
@@ -95,6 +102,16 @@ export default function Home() {
     () => leagues.reduce((sum, league) => sum + league.events.length, 0),
     [leagues]
   );
+  const groupedWatched = useMemo(() => {
+    const grouped = new Map<string, WatchedEvent[]>();
+    watchedEvents.forEach((event) => {
+      if (!grouped.has(event.date)) {
+        grouped.set(event.date, []);
+      }
+      grouped.get(event.date)?.push(event);
+    });
+    return Array.from(grouped.entries());
+  }, [watchedEvents]);
 
   async function loadEvents(date: string) {
     setLoading(true);
@@ -125,9 +142,27 @@ export default function Home() {
     }
   }
 
+  async function loadWatchedEvents() {
+    try {
+      const res = await fetch("/api/watched/list");
+      if (res.status === 401) {
+        setWatchedEvents([]);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error("Failed to load watched matches.");
+      }
+      const data = (await res.json()) as { events: WatchedEvent[] };
+      setWatchedEvents(data.events);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
   useEffect(() => {
     if (status === "authenticated") {
       void loadEvents(selectedDate);
+      void loadWatchedEvents();
     }
   }, [status, selectedDate]);
 
@@ -178,6 +213,7 @@ export default function Home() {
         throw new Error("Failed to update watched matches.");
       }
       await loadEvents(selectedDate);
+      await loadWatchedEvents();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setWatchedIds(new Set(watchedIds));
@@ -339,6 +375,50 @@ export default function Home() {
                       })}
                     </ul>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Your watched matches</h2>
+            <p>All matches you have marked as watched.</p>
+          </div>
+          {watchedEvents.length === 0 ? (
+            <p className="empty-state">
+              No watched matches yet. Pick a day and mark a match above.
+            </p>
+          ) : (
+            <div className="log">
+              {groupedWatched.map(([date, items]) => (
+                <div className="log-day" key={date}>
+                  <div className="log-date">
+                    <span>{formatDisplayDate(date)}</span>
+                    <small>
+                      {items.length} match{items.length === 1 ? "" : "es"}
+                    </small>
+                  </div>
+                  <ul>
+                    {items.map((match) => (
+                      <li key={match.id} className="log-item">
+                        <span className="log-time">
+                          {formatDisplayTime(match.time ?? "")}
+                        </span>
+                        <span className="log-teams">
+                          {match.homeTeam} vs {match.awayTeam}
+                        </span>
+                        <span className="log-league">{match.leagueName}</span>
+                        <span className="log-score">
+                          {match.homeScore !== null &&
+                          match.awayScore !== null
+                            ? `${match.homeScore} - ${match.awayScore}`
+                            : "Score TBD"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ))}
             </div>

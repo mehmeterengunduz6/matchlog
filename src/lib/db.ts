@@ -271,3 +271,29 @@ export async function getWatchedStats(userId: string) {
     totalCount: Number(totalResult.rows[0]?.count ?? 0),
   };
 }
+
+export async function listWatchedEvents(userId: string) {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        user_id as "userId",
+        event_id as "eventId",
+        league_id as "leagueId",
+        league_name as "leagueName",
+        date,
+        time,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        home_score as "homeScore",
+        away_score as "awayScore",
+        created_at as "createdAt"
+      FROM watched_events
+      WHERE user_id = $1
+      ORDER BY date DESC, time DESC, id DESC
+    `,
+    [userId]
+  );
+  return result.rows as WatchedEvent[];
+}
