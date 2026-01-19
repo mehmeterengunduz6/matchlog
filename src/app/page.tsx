@@ -81,6 +81,22 @@ function todayValue() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function formatDate(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = `${date.getMonth() + 1}`.padStart(2, "0");
+  const dd = `${date.getDate()}`.padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function startOfWeek(date: Date) {
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  const start = new Date(date);
+  start.setDate(date.getDate() - diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
 export default function Home() {
   const { data: session, status } = useSession();
   const [stats, setStats] = useState<Stats>({
@@ -180,13 +196,49 @@ export default function Home() {
 
   async function toggleWatched(event: EventItem) {
     const isWatched = watchedIds.has(event.eventId);
-    const optimistic = new Set(watchedIds);
+    const prevWatchedIds = watchedIds;
+    const prevWatchedEvents = watchedEvents;
+    const prevStats = stats;
+
+    const nextWatchedIds = new Set(prevWatchedIds);
     if (isWatched) {
-      optimistic.delete(event.eventId);
+      nextWatchedIds.delete(event.eventId);
     } else {
-      optimistic.add(event.eventId);
+      nextWatchedIds.add(event.eventId);
     }
-    setWatchedIds(optimistic);
+    setWatchedIds(nextWatchedIds);
+
+    const nextWatchedEvents = isWatched
+      ? prevWatchedEvents.filter((item) => item.eventId !== event.eventId)
+      : [
+          {
+            id: Date.now(),
+            createdAt: new Date().toISOString(),
+            eventId: event.eventId,
+            leagueId: event.leagueId,
+            leagueName: event.leagueName,
+            date: event.date,
+            time: event.time || null,
+            homeTeam: event.homeTeam,
+            awayTeam: event.awayTeam,
+            homeScore: event.homeScore,
+            awayScore: event.awayScore,
+          },
+          ...prevWatchedEvents,
+        ];
+    setWatchedEvents(nextWatchedEvents);
+
+    const delta = isWatched ? -1 : 1;
+    const today = new Date();
+    const weekStart = formatDate(startOfWeek(today));
+    const monthStart = formatDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    const isWeek = event.date >= weekStart;
+    const isMonth = event.date >= monthStart;
+    setStats((prev) => ({
+      weekCount: prev.weekCount + (isWeek ? delta : 0),
+      monthCount: prev.monthCount + (isMonth ? delta : 0),
+      totalCount: prev.totalCount + delta,
+    }));
     setPending(event.eventId, true);
 
     try {
@@ -212,11 +264,11 @@ export default function Home() {
       if (!res.ok) {
         throw new Error("Failed to update watched matches.");
       }
-      await loadEvents(selectedDate);
-      await loadWatchedEvents();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
-      setWatchedIds(new Set(watchedIds));
+      setWatchedIds(prevWatchedIds);
+      setWatchedEvents(prevWatchedEvents);
+      setStats(prevStats);
     } finally {
       setPending(event.eventId, false);
     }
