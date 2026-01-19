@@ -25,6 +25,10 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
+const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+});
+
 function formatDisplayDate(value: string | Date) {
   const date =
     value instanceof Date
@@ -58,6 +62,22 @@ function formatDisplayTime(value: string | null) {
   return value;
 }
 
+function formatDate(date: Date) {
+  const yyyy = date.getFullYear();
+  const mm = `${date.getMonth() + 1}`.padStart(2, "0");
+  const dd = `${date.getDate()}`.padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function startOfWeek(date: Date) {
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  const start = new Date(date);
+  start.setDate(date.getDate() - diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
 export default function WatchedPage() {
   const { data: session, status } = useSession();
   const [events, setEvents] = useState<WatchedEvent[]>([]);
@@ -74,6 +94,69 @@ export default function WatchedPage() {
       grouped.get(event.date)?.push(event);
     });
     return Array.from(grouped.entries());
+  }, [events]);
+
+  const insights = useMemo(() => {
+    if (events.length === 0) {
+      return {
+        topTeam: "—",
+        topLeague: "—",
+        topWeekday: "—",
+        weekCount: 0,
+        monthCount: 0,
+        totalCount: 0,
+      };
+    }
+
+    const teamCounts = new Map<string, number>();
+    const leagueCounts = new Map<string, number>();
+    const weekdayCounts = new Map<string, number>();
+    const now = new Date();
+    const weekStart = formatDate(startOfWeek(now));
+    const monthStart = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
+    let weekCount = 0;
+    let monthCount = 0;
+
+    events.forEach((event) => {
+      const teams = [event.homeTeam, event.awayTeam].filter(Boolean);
+      teams.forEach((team) => {
+        teamCounts.set(team, (teamCounts.get(team) ?? 0) + 1);
+      });
+      leagueCounts.set(
+        event.leagueName,
+        (leagueCounts.get(event.leagueName) ?? 0) + 1
+      );
+      const weekday = weekdayFormatter.format(new Date(`${event.date}T00:00:00`));
+      weekdayCounts.set(weekday, (weekdayCounts.get(weekday) ?? 0) + 1);
+
+      if (event.date >= weekStart) {
+        weekCount += 1;
+      }
+      if (event.date >= monthStart) {
+        monthCount += 1;
+      }
+    });
+
+    function pickTop(map: Map<string, number>) {
+      let topName = "—";
+      let topValue = 0;
+      map.forEach((value, key) => {
+        if (value > topValue) {
+          topName = key;
+          topValue = value;
+        }
+      });
+      return topName;
+    }
+
+    return {
+      topTeam: pickTop(teamCounts),
+      topLeague: pickTop(leagueCounts),
+      topWeekday: pickTop(weekdayCounts),
+      weekCount,
+      monthCount,
+      totalCount: events.length,
+    };
   }, [events]);
 
   async function loadWatchedEvents() {
@@ -198,6 +281,32 @@ export default function WatchedPage() {
             Review everything you have marked as watched, and remove mistakes if
             needed.
           </p>
+        </div>
+        <div className="stats">
+          <div className="stat">
+            <span>Most watched team</span>
+            <strong>{insights.topTeam}</strong>
+          </div>
+          <div className="stat">
+            <span>Top league</span>
+            <strong>{insights.topLeague}</strong>
+          </div>
+          <div className="stat">
+            <span>Busiest day</span>
+            <strong>{insights.topWeekday}</strong>
+          </div>
+          <div className="stat">
+            <span>This week</span>
+            <strong>{insights.weekCount}</strong>
+          </div>
+          <div className="stat">
+            <span>This month</span>
+            <strong>{insights.monthCount}</strong>
+          </div>
+          <div className="stat">
+            <span>Total watched</span>
+            <strong>{insights.totalCount}</strong>
+          </div>
         </div>
       </header>
 
