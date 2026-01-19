@@ -79,6 +79,29 @@ function formatDate(date: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function localDateKey(date: string | null, time: string | null, createdAt: string) {
+  if (date) {
+    if (date.includes("T")) {
+      const parsed = new Date(date);
+      if (!Number.isNaN(parsed.getTime())) {
+        return formatDate(parsed);
+      }
+    }
+    if (time) {
+      const parsed = new Date(`${date}T${time}Z`);
+      if (!Number.isNaN(parsed.getTime())) {
+        return formatDate(parsed);
+      }
+    }
+    return date.slice(0, 10);
+  }
+  const fallback = new Date(createdAt);
+  if (!Number.isNaN(fallback.getTime())) {
+    return formatDate(fallback);
+  }
+  return null;
+}
+
 function startOfWeek(date: Date) {
   const day = date.getDay();
   const diff = (day + 6) % 7;
@@ -136,8 +159,7 @@ export default function WatchedPage() {
         event.leagueName,
         (leagueCounts.get(event.leagueName) ?? 0) + 1
       );
-      const dateValue = event.date || event.createdAt;
-      const dayKey = dateValue ? dateValue.slice(0, 10) : null;
+      const dayKey = localDateKey(event.date, event.time, event.createdAt);
       if (dayKey) {
         dayCounts.set(dayKey, (dayCounts.get(dayKey) ?? 0) + 1);
       }
