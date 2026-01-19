@@ -48,24 +48,33 @@ function formatDisplayDate(value: string | Date) {
   return dateFormatter.format(date);
 }
 
-function formatDisplayTime(value: string) {
-  if (!value) {
+function formatEventTime(date: string, time: string) {
+  if (!time) {
     return "TBD";
   }
-  if (value.includes("T")) {
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString("en-GB", {
+  if (time.includes("T")) {
+    const parsed = new Date(time);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString("en-GB", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
       });
     }
   }
-  if (value.length >= 5) {
-    return value.slice(0, 5);
+  const hasSeconds = time.length >= 8;
+  const iso = date ? `${date}T${time}${hasSeconds ? "Z" : "Z"}` : "";
+  if (iso) {
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    }
   }
-  return value;
+  return time.length >= 5 ? time.slice(0, 5) : time;
 }
 
 function todayValue() {
@@ -351,7 +360,7 @@ export default function Home() {
                           <li key={event.eventId} className="event-card">
                             <div>
                               <p className="event-time">
-                                {formatDisplayTime(event.time)}
+                                {formatEventTime(event.date, event.time)}
                               </p>
                               <p className="event-teams">
                                 {event.homeTeam} vs {event.awayTeam}

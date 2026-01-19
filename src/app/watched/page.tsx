@@ -42,24 +42,32 @@ function formatDisplayDate(value: string | Date) {
   return dateFormatter.format(date);
 }
 
-function formatDisplayTime(value: string | null) {
-  if (!value) {
+function formatEventTime(date: string, time: string | null) {
+  if (!time) {
     return "TBD";
   }
-  if (value.includes("T")) {
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleTimeString("en-GB", {
+  if (time.includes("T")) {
+    const parsed = new Date(time);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString("en-GB", {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
       });
     }
   }
-  if (value.length >= 5) {
-    return value.slice(0, 5);
+  const iso = date ? `${date}T${time}Z` : "";
+  if (iso) {
+    const parsed = new Date(iso);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    }
   }
-  return value;
+  return time.length >= 5 ? time.slice(0, 5) : time;
 }
 
 function formatDate(date: Date) {
@@ -341,7 +349,7 @@ export default function WatchedPage() {
                     {items.map((match) => (
                       <li key={match.id} className="log-item">
                         <span className="log-time">
-                          {formatDisplayTime(match.time)}
+                          {formatEventTime(match.date, match.time)}
                         </span>
                         <span className="log-teams">
                           {match.homeTeam} vs {match.awayTeam}
