@@ -25,8 +25,10 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
 });
 
-const weekdayFormatter = new Intl.DateTimeFormat("en-US", {
-  weekday: "long",
+const busiestDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
 });
 
 function formatDisplayDate(value: string | Date) {
@@ -118,7 +120,7 @@ export default function WatchedPage() {
 
     const teamCounts = new Map<string, number>();
     const leagueCounts = new Map<string, number>();
-    const weekdayCounts = new Map<string, number>();
+    const dayCounts = new Map<string, number>();
     const now = new Date();
     const weekStart = formatDate(startOfWeek(now));
     const monthStart = formatDate(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -135,14 +137,9 @@ export default function WatchedPage() {
         (leagueCounts.get(event.leagueName) ?? 0) + 1
       );
       const dateValue = event.date || event.createdAt;
-      const weekdayDate = dateValue
-        ? dateValue.includes("T")
-          ? new Date(dateValue)
-          : new Date(`${dateValue}T00:00:00`)
-        : null;
-      if (weekdayDate && !Number.isNaN(weekdayDate.getTime())) {
-        const weekday = weekdayFormatter.format(weekdayDate);
-        weekdayCounts.set(weekday, (weekdayCounts.get(weekday) ?? 0) + 1);
+      const dayKey = dateValue ? dateValue.slice(0, 10) : null;
+      if (dayKey) {
+        dayCounts.set(dayKey, (dayCounts.get(dayKey) ?? 0) + 1);
       }
 
       if (event.date >= weekStart) {
@@ -165,10 +162,16 @@ export default function WatchedPage() {
       return topName;
     }
 
+    const busiestDayKey = pickTop(dayCounts);
+    const busiestDay =
+      busiestDayKey === "—"
+        ? "—"
+        : busiestDateFormatter.format(new Date(`${busiestDayKey}T00:00:00`));
+
     return {
       topTeam: pickTop(teamCounts),
       topLeague: pickTop(leagueCounts),
-      topWeekday: pickTop(weekdayCounts),
+      topWeekday: busiestDay,
       weekCount,
       monthCount,
       totalCount: events.length,
