@@ -126,8 +126,11 @@ export default function WatchedPage() {
         event.leagueName,
         (leagueCounts.get(event.leagueName) ?? 0) + 1
       );
-      const weekday = weekdayFormatter.format(new Date(`${event.date}T00:00:00`));
-      weekdayCounts.set(weekday, (weekdayCounts.get(weekday) ?? 0) + 1);
+      const weekdayDate = new Date(`${event.date}T00:00:00`);
+      if (!Number.isNaN(weekdayDate.getTime())) {
+        const weekday = weekdayFormatter.format(weekdayDate);
+        weekdayCounts.set(weekday, (weekdayCounts.get(weekday) ?? 0) + 1);
+      }
 
       if (event.date >= weekStart) {
         weekCount += 1;
