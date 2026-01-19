@@ -81,6 +81,12 @@ h3 {
   gap: 12px;
 }
 
+.auth-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .eyebrow {
   text-transform: uppercase;
   font-size: 0.75rem;
