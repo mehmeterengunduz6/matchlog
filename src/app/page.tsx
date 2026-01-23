@@ -14,6 +14,7 @@ type EventItem = {
   eventId: string;
   leagueId: string;
   leagueName: string;
+  leagueBadge: string;
   date: string;
   time: string;
   homeTeam: string;
@@ -341,7 +342,11 @@ export default function Home() {
                         {event.homeTeam} vs {event.awayTeam}
                       </p>
                       <p className="event-meta">
-                        <span className="league-badge">{event.leagueName}</span>
+                        <img
+                          src={event.leagueBadge}
+                          alt={event.leagueName}
+                          className="league-badge-img"
+                        />
                         <span className="event-score">
                           {event.homeScore !== null &&
                           event.awayScore !== null

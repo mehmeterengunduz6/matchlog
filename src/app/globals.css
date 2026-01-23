@@ -363,15 +363,10 @@ h3 {
   margin-top: 4px;
 }
 
-.league-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+.league-badge-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .event-score {
