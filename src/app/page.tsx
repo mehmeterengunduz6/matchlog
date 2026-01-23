@@ -79,6 +79,17 @@ function formatEventTime(date: string, time: string) {
   return time.length >= 5 ? time.slice(0, 5) : time;
 }
 
+function isMatchLive(date: string, time: string): boolean {
+  if (!time) return false;
+  const now = new Date();
+  // Parse match start time
+  const matchStart = new Date(`${date}T${time}Z`);
+  if (Number.isNaN(matchStart.getTime())) return false;
+  // Match is live if now is between start and start + 2 hours
+  const matchEnd = new Date(matchStart.getTime() + 2 * 60 * 60 * 1000);
+  return now >= matchStart && now < matchEnd;
+}
+
 function todayValue() {
   const now = new Date();
   const yyyy = now.getFullYear();
@@ -422,11 +433,13 @@ export default function Home() {
                       {league.events.map((event) => {
                         const isWatched = watchedIds.has(event.eventId);
                         const isPending = pendingIds.has(event.eventId);
+                        const isLive = isMatchLive(event.date, event.time);
                         return (
                           <li key={event.eventId} className="event-card">
                             <div>
                               <p className="event-time">
                                 {formatEventTime(event.date, event.time)}
+                                {isLive && <span className="live-badge">LIVE</span>}
                               </p>
                               <p className="event-teams">
                                 {event.homeTeam} vs {event.awayTeam}
