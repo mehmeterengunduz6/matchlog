@@ -22,12 +22,6 @@ type EventItem = {
   awayScore: number | null;
 };
 
-type LeagueGroup = {
-  id: string;
-  name: string;
-  events: EventItem[];
-};
-
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   month: "short",
@@ -109,7 +103,7 @@ export default function Home() {
     totalCount: 0,
   });
   const [selectedDate, setSelectedDate] = useState(todayValue());
-  const [leagues, setLeagues] = useState<LeagueGroup[]>([]);
+  const [events, setEvents] = useState<EventItem[]>([]);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,18 +111,13 @@ export default function Home() {
 
   const isAuthenticated = status === "authenticated";
 
-  const totalEvents = useMemo(
-    () => leagues.reduce((sum, league) => sum + league.events.length, 0),
-    [leagues]
-  );
-
   async function loadEvents(date: string) {
     setLoading(true);
     try {
       const res = await fetch(`/api/events?date=${date}`);
       if (res.status === 401) {
         setError("Sign in to see available matches.");
-        setLeagues([]);
+        setEvents([]);
         setWatchedIds(new Set());
         return;
       }
@@ -136,11 +125,11 @@ export default function Home() {
         throw new Error("Failed to load matches for the day.");
       }
       const data = (await res.json()) as {
-        leagues: LeagueGroup[];
+        events: EventItem[];
         watchedIds: string[];
         stats: Stats;
       };
-      setLeagues(data.leagues);
+      setEvents(data.events);
       setWatchedIds(new Set(data.watchedIds));
       setStats(data.stats);
       setError(null);
@@ -329,61 +318,50 @@ export default function Home() {
             </span>
           </div>
           <div className="summary-row">
-            <span>{totalEvents} matches found</span>
+            <span>{events.length} matches found</span>
             <span>{watchedIds.size} marked watched</span>
           </div>
           {error ? <p className="form-error">{error}</p> : null}
           {loading ? (
             <p className="empty-state">Loading fixtures...</p>
-          ) : leagues.length === 0 ? (
+          ) : events.length === 0 ? (
             <p className="empty-state">No fixtures found for this day.</p>
           ) : (
-            <div className="league-list">
-              {leagues
-                .filter((league) => league.events.length > 0)
-                .map((league) => (
-                  <div key={league.id} className="league-group">
-                    <div className="league-header">
-                      <h3>{league.name}</h3>
-                      <span>{league.events.length} matches</span>
+            <ul className="event-list">
+              {events.map((event) => {
+                const isWatched = watchedIds.has(event.eventId);
+                const isPending = pendingIds.has(event.eventId);
+                return (
+                  <li key={event.eventId} className="event-card">
+                    <div>
+                      <p className="event-time">
+                        {formatEventTime(event.date, event.time)}
+                      </p>
+                      <p className="event-teams">
+                        {event.homeTeam} vs {event.awayTeam}
+                      </p>
+                      <p className="event-meta">
+                        <span className="league-badge">{event.leagueName}</span>
+                        <span className="event-score">
+                          {event.homeScore !== null &&
+                          event.awayScore !== null
+                            ? `${event.homeScore} - ${event.awayScore}`
+                            : "Score TBD"}
+                        </span>
+                      </p>
                     </div>
-                    <ul className="event-list">
-                      {[...league.events]
-                        .sort((a, b) => a.time.localeCompare(b.time))
-                        .map((event) => {
-                        const isWatched = watchedIds.has(event.eventId);
-                        const isPending = pendingIds.has(event.eventId);
-                        return (
-                          <li key={event.eventId} className="event-card">
-                            <div>
-                              <p className="event-time">
-                                {formatEventTime(event.date, event.time)}
-                              </p>
-                              <p className="event-teams">
-                                {event.homeTeam} vs {event.awayTeam}
-                              </p>
-                              <p className="event-score">
-                                {event.homeScore !== null &&
-                                event.awayScore !== null
-                                  ? `${event.homeScore} - ${event.awayScore}`
-                                  : "Score TBD"}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              className={isWatched ? "tag-button" : "ghost-button"}
-                              onClick={() => toggleWatched(event)}
-                              disabled={isPending}
-                            >
-                              {isWatched ? "Watched" : "Mark watched"}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ))}
-            </div>
+                    <button
+                      type="button"
+                      className={isWatched ? "tag-button" : "ghost-button"}
+                      onClick={() => toggleWatched(event)}
+                      disabled={isPending}
+                    >
+                      {isWatched ? "Watched" : "Mark watched"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </section>
       </main>

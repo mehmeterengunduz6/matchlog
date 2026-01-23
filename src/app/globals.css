@@ -356,10 +356,27 @@ h3 {
   margin-top: 2px;
 }
 
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.league-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .event-score {
   font-size: 0.85rem;
   color: #7b7467;
-  margin-top: 4px;
 }
 
 .log-day {
