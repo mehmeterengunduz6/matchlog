@@ -23,6 +23,13 @@ type EventItem = {
   awayScore: number | null;
 };
 
+type LeagueGroup = {
+  id: string;
+  name: string;
+  badge: string;
+  events: EventItem[];
+};
+
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   month: "short",
@@ -104,8 +111,9 @@ export default function Home() {
     totalCount: 0,
   });
   const [selectedDate, setSelectedDate] = useState(todayValue());
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [leagues, setLeagues] = useState<LeagueGroup[]>([]);
   const [watchedIds, setWatchedIds] = useState<Set<string>>(new Set());
+  const [leagueOrder, setLeagueOrder] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
@@ -118,7 +126,7 @@ export default function Home() {
       const res = await fetch(`/api/events?date=${date}`);
       if (res.status === 401) {
         setError("Sign in to see available matches.");
-        setEvents([]);
+        setLeagues([]);
         setWatchedIds(new Set());
         return;
       }
@@ -126,12 +134,15 @@ export default function Home() {
         throw new Error("Failed to load matches for the day.");
       }
       const data = (await res.json()) as {
-        events: EventItem[];
+        leagues: LeagueGroup[];
         watchedIds: string[];
         stats: Stats;
       };
-      setEvents(data.events);
-      setWatchedIds(new Set(data.watchedIds));
+      setLeagues(data.leagues ?? []);
+      if (leagueOrder.length === 0 && data.leagues?.length > 0) {
+        setLeagueOrder(data.leagues.map((l) => l.id));
+      }
+      setWatchedIds(new Set(data.watchedIds ?? []));
       setStats(data.stats);
       setError(null);
     } catch (err) {
@@ -319,54 +330,131 @@ export default function Home() {
             </span>
           </div>
           <div className="summary-row">
-            <span>{events.length} matches found</span>
+            <span>
+              {leagues.reduce((sum, l) => sum + l.events.length, 0)} matches
+              found
+            </span>
             <span>{watchedIds.size} marked watched</span>
           </div>
           {error ? <p className="form-error">{error}</p> : null}
           {loading ? (
             <p className="empty-state">Loading fixtures...</p>
-          ) : events.length === 0 ? (
+          ) : leagues.length === 0 ? (
             <p className="empty-state">No fixtures found for this day.</p>
           ) : (
-            <ul className="event-list">
-              {events.map((event) => {
-                const isWatched = watchedIds.has(event.eventId);
-                const isPending = pendingIds.has(event.eventId);
-                return (
-                  <li key={event.eventId} className="event-card">
-                    <div>
-                      <p className="event-time">
-                        {formatEventTime(event.date, event.time)}
-                      </p>
-                      <p className="event-teams">
-                        {event.homeTeam} vs {event.awayTeam}
-                      </p>
-                      <p className="event-meta">
+            <div className="league-list">
+              {leagues
+                .filter((league) => league.events.length > 0)
+                .map((league, index) => (
+                  <div key={league.id} className="league-group">
+                    <div className="league-header">
+                      <div className="league-title">
                         <img
-                          src={event.leagueBadge}
-                          alt={event.leagueName}
+                          src={league.badge}
+                          alt={league.name}
                           className="league-badge-img"
                         />
-                        <span className="event-score">
-                          {event.homeScore !== null &&
-                          event.awayScore !== null
-                            ? `${event.homeScore} - ${event.awayScore}`
-                            : "Score TBD"}
+                        <h3>{league.name}</h3>
+                      </div>
+                      <div className="league-actions">
+                        <span className="league-count">
+                          {league.events.length} matches
                         </span>
-                      </p>
+                        <button
+                          type="button"
+                          className="order-button"
+                          disabled={index === 0}
+                          onClick={() => {
+                            const newOrder = [...leagueOrder];
+                            const idx = newOrder.indexOf(league.id);
+                            if (idx > 0) {
+                              [newOrder[idx - 1], newOrder[idx]] = [
+                                newOrder[idx],
+                                newOrder[idx - 1],
+                              ];
+                              setLeagueOrder(newOrder);
+                              setLeagues((prev) => {
+                                const sorted = [...prev].sort(
+                                  (a, b) =>
+                                    newOrder.indexOf(a.id) -
+                                    newOrder.indexOf(b.id)
+                                );
+                                return sorted;
+                              });
+                            }
+                          }}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="order-button"
+                          disabled={
+                            index ===
+                            leagues.filter((l) => l.events.length > 0).length -
+                              1
+                          }
+                          onClick={() => {
+                            const newOrder = [...leagueOrder];
+                            const idx = newOrder.indexOf(league.id);
+                            if (idx < newOrder.length - 1) {
+                              [newOrder[idx], newOrder[idx + 1]] = [
+                                newOrder[idx + 1],
+                                newOrder[idx],
+                              ];
+                              setLeagueOrder(newOrder);
+                              setLeagues((prev) => {
+                                const sorted = [...prev].sort(
+                                  (a, b) =>
+                                    newOrder.indexOf(a.id) -
+                                    newOrder.indexOf(b.id)
+                                );
+                                return sorted;
+                              });
+                            }
+                          }}
+                        >
+                          ▼
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      className={isWatched ? "tag-button" : "ghost-button"}
-                      onClick={() => toggleWatched(event)}
-                      disabled={isPending}
-                    >
-                      {isWatched ? "Watched" : "Mark watched"}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                    <ul className="event-list">
+                      {league.events.map((event) => {
+                        const isWatched = watchedIds.has(event.eventId);
+                        const isPending = pendingIds.has(event.eventId);
+                        return (
+                          <li key={event.eventId} className="event-card">
+                            <div>
+                              <p className="event-time">
+                                {formatEventTime(event.date, event.time)}
+                              </p>
+                              <p className="event-teams">
+                                {event.homeTeam} vs {event.awayTeam}
+                              </p>
+                              <p className="event-score">
+                                {event.homeScore !== null &&
+                                event.awayScore !== null
+                                  ? `${event.homeScore} - ${event.awayScore}`
+                                  : "Score TBD"}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className={
+                                isWatched ? "tag-button" : "ghost-button"
+                              }
+                              onClick={() => toggleWatched(event)}
+                              disabled={isPending}
+                            >
+                              {isWatched ? "Watched" : "Mark watched"}
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+            </div>
           )}
         </section>
       </main>

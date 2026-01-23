@@ -323,9 +323,50 @@ h3 {
   color: #4a4438;
 }
 
-.league-header span {
+.league-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.league-title h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.league-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.league-count {
   font-size: 0.85rem;
   color: #7d766b;
+}
+
+.order-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #d9d1c3;
+  background: #fff;
+  color: #6b6559;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.order-button:hover:not(:disabled) {
+  background: #f4ede0;
+  border-color: #9d8f7b;
+}
+
+.order-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .event-list {
