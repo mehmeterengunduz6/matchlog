@@ -128,6 +128,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [showSettings, setShowSettings] = useState(false);
 
   const isAuthenticated = status === "authenticated";
 
@@ -281,9 +282,9 @@ export default function Home() {
               <button
                 type="button"
                 className="ghost-button"
-                onClick={() => signOut()}
+                onClick={() => setShowSettings(true)}
               >
-                Sign out
+                Settings
               </button>
             </div>
           </div>
@@ -367,67 +368,9 @@ export default function Home() {
                         />
                         <h3>{league.name}</h3>
                       </div>
-                      <div className="league-actions">
-                        <span className="league-count">
-                          {league.events.length} matches
-                        </span>
-                        <button
-                          type="button"
-                          className="order-button"
-                          disabled={index === 0}
-                          onClick={() => {
-                            const newOrder = [...leagueOrder];
-                            const idx = newOrder.indexOf(league.id);
-                            if (idx > 0) {
-                              [newOrder[idx - 1], newOrder[idx]] = [
-                                newOrder[idx],
-                                newOrder[idx - 1],
-                              ];
-                              setLeagueOrder(newOrder);
-                              setLeagues((prev) => {
-                                const sorted = [...prev].sort(
-                                  (a, b) =>
-                                    newOrder.indexOf(a.id) -
-                                    newOrder.indexOf(b.id)
-                                );
-                                return sorted;
-                              });
-                            }
-                          }}
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          className="order-button"
-                          disabled={
-                            index ===
-                            leagues.filter((l) => l.events.length > 0).length -
-                              1
-                          }
-                          onClick={() => {
-                            const newOrder = [...leagueOrder];
-                            const idx = newOrder.indexOf(league.id);
-                            if (idx < newOrder.length - 1) {
-                              [newOrder[idx], newOrder[idx + 1]] = [
-                                newOrder[idx + 1],
-                                newOrder[idx],
-                              ];
-                              setLeagueOrder(newOrder);
-                              setLeagues((prev) => {
-                                const sorted = [...prev].sort(
-                                  (a, b) =>
-                                    newOrder.indexOf(a.id) -
-                                    newOrder.indexOf(b.id)
-                                );
-                                return sorted;
-                              });
-                            }
-                          }}
-                        >
-                          ▼
-                        </button>
-                      </div>
+                      <span className="league-count">
+                        {league.events.length} matches
+                      </span>
                     </div>
                     <ul className="event-list">
                       {league.events.map((event) => {
@@ -471,6 +414,110 @@ export default function Home() {
           )}
         </section>
       </main>
+
+      {showSettings && (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Settings</h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setShowSettings(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="settings-section">
+                <h3>League Order</h3>
+                <p className="settings-description">
+                  Drag or use arrows to reorder leagues
+                </p>
+                <div className="league-order-list">
+                  {leagueOrder.map((leagueId, index) => {
+                    const league = leagues.find((l) => l.id === leagueId);
+                    if (!league) return null;
+                    return (
+                      <div key={leagueId} className="league-order-item">
+                        <div className="league-order-info">
+                          <img
+                            src={league.badge}
+                            alt={league.name}
+                            className="league-badge-img"
+                          />
+                          <span>{league.name}</span>
+                        </div>
+                        <div className="league-order-actions">
+                          <button
+                            type="button"
+                            className="order-button"
+                            disabled={index === 0}
+                            onClick={() => {
+                              const newOrder = [...leagueOrder];
+                              [newOrder[index - 1], newOrder[index]] = [
+                                newOrder[index],
+                                newOrder[index - 1],
+                              ];
+                              setLeagueOrder(newOrder);
+                              setLeagues((prev) =>
+                                [...prev].sort(
+                                  (a, b) =>
+                                    newOrder.indexOf(a.id) -
+                                    newOrder.indexOf(b.id)
+                                )
+                              );
+                            }}
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            className="order-button"
+                            disabled={index === leagueOrder.length - 1}
+                            onClick={() => {
+                              const newOrder = [...leagueOrder];
+                              [newOrder[index], newOrder[index + 1]] = [
+                                newOrder[index + 1],
+                                newOrder[index],
+                              ];
+                              setLeagueOrder(newOrder);
+                              setLeagues((prev) =>
+                                [...prev].sort(
+                                  (a, b) =>
+                                    newOrder.indexOf(a.id) -
+                                    newOrder.indexOf(b.id)
+                                )
+                              );
+                            }}
+                          >
+                            ▼
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3>Account</h3>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    setShowSettings(false);
+                    signOut();
+                  }}
+                >
+                  Sign out
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
