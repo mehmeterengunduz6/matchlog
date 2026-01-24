@@ -329,15 +329,14 @@ export default function Home() {
                 max={todayValue()}
               />
             </label>
-            {selectedDate !== todayValue() && (
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() => setSelectedDate(todayValue())}
-              >
-                Jump to today
-              </button>
-            )}
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => loadEvents(selectedDate)}
+              disabled={loading}
+            >
+              {loading ? "Refreshing..." : "Refresh fixtures"}
+            </button>
             <span className="summary-pill">
               {formatDisplayDate(selectedDate)}
             </span>
