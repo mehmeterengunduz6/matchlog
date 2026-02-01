@@ -297,3 +297,55 @@ export async function listWatchedEvents(userId: string) {
   );
   return result.rows as WatchedEvent[];
 }
+
+export type UserPreferences = {
+  collapsedLeagues?: string[];
+  hiddenLeagues?: string[];
+  leagueOrder?: string[];
+};
+
+export type UserPreferencesRecord = {
+  userId: string;
+  preferences: UserPreferences;
+  updatedAt: string;
+  createdAt: string;
+};
+
+export async function getUserPreferences(
+  userId: string
+): Promise<UserPreferences> {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      SELECT preferences
+      FROM user_preferences
+      WHERE user_id = $1
+    `,
+    [userId]
+  );
+  return (result.rows[0]?.preferences as UserPreferences) ?? {};
+}
+
+export async function updateUserPreferences(
+  userId: string,
+  preferences: Partial<UserPreferences>
+): Promise<UserPreferencesRecord> {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      INSERT INTO user_preferences (user_id, preferences)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET
+        preferences = user_preferences.preferences || EXCLUDED.preferences,
+        updated_at = now()
+      RETURNING
+        user_id as "userId",
+        preferences,
+        updated_at as "updatedAt",
+        created_at as "createdAt"
+    `,
+    [userId, JSON.stringify(preferences)]
+  );
+  return result.rows[0] as UserPreferencesRecord;
+}
