@@ -1,4 +1,4 @@
-import { fetchAllTeams } from "@/lib/sportsdb";
+import { getAllTeams } from "@/lib/sportsdb";
 import { getUserIdFromRequest } from "@/lib/mobile-auth";
 
 export const dynamic = "force-dynamic";
@@ -9,8 +9,9 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  // Fetch all teams from TheSportsDB for featured leagues
-  const teamsByLeague = await fetchAllTeams();
+  // Get curated list of teams for featured leagues
+  // Note: TheSportsDB free tier doesn't support lookup_all_teams endpoint
+  const teamsByLeague = getAllTeams();
 
   return Response.json({ teamsByLeague });
 }

@@ -49,18 +49,7 @@ export const FEATURED_LEAGUES: LeagueConfig[] = [
 ];
 
 const cache = new Map<string, { expiresAt: number; data: NormalizedEvent[] }>();
-const teamsCache = new Map<string, { expiresAt: number; data: string[] }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const TEAMS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour for teams (they don't change often)
-
-type SportsDbTeam = {
-  idTeam: string;
-  strTeam: string;
-};
-
-type SportsDbTeamsResponse = {
-  teams: SportsDbTeam[] | null;
-};
 
 function normalizeEvent(
   event: SportsDbEvent,
@@ -125,30 +114,6 @@ export async function fetchEventsByDate(date: string) {
   return events;
 }
 
-async function fetchLeagueTeams(leagueId: string): Promise<string[]> {
-  const cached = teamsCache.get(leagueId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
-  }
-
-  const url = `${BASE_URL}/lookup_all_teams.php?id=${leagueId}`;
-  const res = await fetch(url, { next: { revalidate: 3600 } }); // Cache for 1 hour
-
-  if (!res.ok) {
-    console.error(`TheSportsDB teams error for league ${leagueId}: ${res.status}`);
-    return [];
-  }
-
-  const data = (await res.json()) as SportsDbTeamsResponse;
-  const teams = (data.teams ?? [])
-    .map((team) => team.strTeam)
-    .filter(Boolean)
-    .sort();
-
-  teamsCache.set(leagueId, { expiresAt: Date.now() + TEAMS_CACHE_TTL_MS, data: teams });
-  return teams;
-}
-
 export type TeamsByLeague = {
   leagueId: string;
   leagueName: string;
@@ -156,18 +121,63 @@ export type TeamsByLeague = {
   teams: string[];
 };
 
-export async function fetchAllTeams(): Promise<TeamsByLeague[]> {
-  const teamsByLeague = await Promise.all(
-    FEATURED_LEAGUES.map(async (league) => {
-      const teams = await fetchLeagueTeams(league.id);
-      return {
-        leagueId: league.id,
-        leagueName: league.name,
-        leagueBadge: league.badge,
-        teams,
-      };
-    })
-  );
+// Curated list of top teams for each featured league
+// Note: TheSportsDB free tier doesn't support lookup_all_teams endpoint
+const FEATURED_TEAMS: Record<string, string[]> = {
+  "4328": [ // English Premier League
+    "Arsenal", "Aston Villa", "Brighton", "Burnley", "Chelsea",
+    "Crystal Palace", "Everton", "Fulham", "Liverpool", "Luton Town",
+    "Manchester City", "Manchester Utd", "Newcastle", "Nottingham Forest",
+    "Sheffield Utd", "Tottenham", "West Ham", "Wolves"
+  ],
+  "4335": [ // Spanish La Liga
+    "Athletic Bilbao", "Atletico Madrid", "Barcelona", "Celta Vigo",
+    "Getafe", "Girona", "Granada", "Las Palmas", "Mallorca",
+    "Osasuna", "Rayo Vallecano", "Real Betis", "Real Madrid",
+    "Real Sociedad", "Sevilla", "Valencia", "Villarreal"
+  ],
+  "4332": [ // Italian Serie A
+    "Atalanta", "Bologna", "Cagliari", "Empoli", "Fiorentina",
+    "Frosinone", "Genoa", "Hellas Verona", "Inter", "Juventus",
+    "Lazio", "Lecce", "AC Milan", "Monza", "Napoli", "Roma",
+    "Salernitana", "Sassuolo", "Torino", "Udinese"
+  ],
+  "4331": [ // German Bundesliga
+    "Augsburg", "Bayer Leverkusen", "Bayern Munich", "Bochum",
+    "Borussia Dortmund", "Darmstadt", "Eintracht Frankfurt",
+    "FC Koln", "Freiburg", "Heidenheim", "Hoffenheim",
+    "Mainz", "Monchengladbach", "RB Leipzig", "Stuttgart",
+    "Union Berlin", "Werder Bremen", "Wolfsburg"
+  ],
+  "4334": [ // French Ligue 1
+    "Brest", "Clermont Foot", "Le Havre", "Lens", "Lille",
+    "Lyon", "Marseille", "Metz", "Monaco", "Montpellier",
+    "Nantes", "Nice", "Paris Saint Germain", "Reims", "Rennes",
+    "Strasbourg", "Toulouse"
+  ],
+  "4339": [ // Turkish Super Lig
+    "Adana Demirspor", "Alanyaspor", "Ankaragucu", "Antalyaspor",
+    "Besiktas", "Fatih Karagumruk", "Fenerbahce", "Galatasaray",
+    "Gaziantep FK", "Hatayspor", "Istanbulspor", "Kasimpasa",
+    "Kayserispor", "Konyaspor", "Pendikspor", "Rizespor",
+    "Samsunspor", "Sivasspor", "Trabzonspor"
+  ],
+  "4480": [ // UEFA Champions League
+    "Arsenal", "Atletico Madrid", "Barcelona", "Bayern Munich",
+    "Benfica", "Borussia Dortmund", "Chelsea", "Copenhagen",
+    "Feyenoord", "Galatasaray", "Inter", "Lazio", "Leipzig",
+    "Lens", "Liverpool", "Manchester City", "Manchester Utd",
+    "AC Milan", "Napoli", "Newcastle", "Paris Saint Germain",
+    "Porto", "PSV", "Real Madrid", "Real Sociedad", "Salzburg",
+    "Sevilla", "Shakhtar Donetsk", "Union Berlin", "Young Boys"
+  ]
+};
 
-  return teamsByLeague.filter((league) => league.teams.length > 0);
+export function getAllTeams(): TeamsByLeague[] {
+  return FEATURED_LEAGUES.map((league) => ({
+    leagueId: league.id,
+    leagueName: league.name,
+    leagueBadge: league.badge,
+    teams: FEATURED_TEAMS[league.id] || [],
+  })).filter((league) => league.teams.length > 0);
 }
