@@ -27,87 +27,107 @@ function getAudienceList() {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json().catch(() => null)) as { idToken?: string } | null;
-  const idToken = body?.idToken;
-  if (!idToken) {
-    return Response.json({ error: "Missing idToken." }, { status: 400 });
-  }
+  try {
+    const body = (await request.json().catch(() => null)) as { idToken?: string } | null;
+    const idToken = body?.idToken;
+    if (!idToken) {
+      return Response.json({ error: "Missing idToken." }, { status: 400 });
+    }
 
-  const client = new OAuth2Client();
-  const ticket = await client.verifyIdToken({
-    idToken,
-    audience: getAudienceList(),
-  });
-  const payload = ticket.getPayload();
-  if (!payload?.sub || !payload.email) {
-    return Response.json({ error: "Invalid token." }, { status: 401 });
-  }
+    const client = new OAuth2Client();
+    let ticket;
+    let payload;
 
-  const pool = getPool();
-  const email = payload.email;
-  const name = payload.name ?? null;
-  const image = payload.picture ?? null;
-  const providerAccountId = payload.sub;
+    try {
+      ticket = await client.verifyIdToken({
+        idToken,
+        audience: getAudienceList(),
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      console.error("Token verification failed:", err);
+      return Response.json({
+        error: "Token verification failed.",
+        details: err instanceof Error ? err.message : String(err)
+      }, { status: 401 });
+    }
 
-  const existingUser = await pool.query(
-    `SELECT id FROM users WHERE email = $1 LIMIT 1`,
-    [email]
-  );
-  let userId = existingUser.rows[0]?.id as string | undefined;
+    if (!payload?.sub || !payload.email) {
+      return Response.json({ error: "Invalid token payload." }, { status: 401 });
+    }
 
-  if (!userId) {
-    const created = await pool.query(
-      `
-        INSERT INTO users (name, email, image)
-        VALUES ($1, $2, $3)
-        RETURNING id
-      `,
-      [name, email, image]
+    const pool = getPool();
+    const email = payload.email;
+    const name = payload.name ?? null;
+    const image = payload.picture ?? null;
+    const providerAccountId = payload.sub;
+
+    const existingUser = await pool.query(
+      `SELECT id FROM users WHERE email = $1 LIMIT 1`,
+      [email]
     );
-    userId = created.rows[0]?.id as string | undefined;
-  } else {
+    let userId = existingUser.rows[0]?.id as string | undefined;
+
+    if (!userId) {
+      const created = await pool.query(
+        `
+          INSERT INTO users (name, email, image)
+          VALUES ($1, $2, $3)
+          RETURNING id
+        `,
+        [name, email, image]
+      );
+      userId = created.rows[0]?.id as string | undefined;
+    } else {
+      await pool.query(
+        `
+          UPDATE users
+          SET name = $1, image = $2
+          WHERE id = $3
+        `,
+        [name, image, userId]
+      );
+    }
+
     await pool.query(
       `
-        UPDATE users
-        SET name = $1, image = $2
-        WHERE id = $3
+        INSERT INTO accounts
+          ("userId", type, provider, "providerAccountId", id_token)
+        VALUES
+          ($1, 'oauth', 'google', $2, $3)
+        ON CONFLICT (provider, "providerAccountId")
+        DO UPDATE SET
+          "userId" = EXCLUDED."userId",
+          id_token = EXCLUDED.id_token
       `,
-      [name, image, userId]
+      [userId, providerAccountId, idToken]
     );
+
+    const sessionToken = crypto.randomUUID();
+    const expires = new Date(Date.now() + SESSION_TTL_MS);
+    await pool.query(
+      `
+        INSERT INTO sessions ("sessionToken", "userId", expires)
+        VALUES ($1, $2, $3)
+      `,
+      [sessionToken, userId, expires]
+    );
+
+    return Response.json({
+      token: sessionToken,
+      user: {
+        id: userId,
+        name,
+        email,
+        image,
+      },
+      expires: expires.toISOString(),
+    });
+  } catch (err) {
+    console.error("Mobile login error:", err);
+    return Response.json({
+      error: "Internal server error.",
+      details: err instanceof Error ? err.message : String(err)
+    }, { status: 500 });
   }
-
-  await pool.query(
-    `
-      INSERT INTO accounts
-        ("userId", type, provider, "providerAccountId", id_token)
-      VALUES
-        ($1, 'oauth', 'google', $2, $3)
-      ON CONFLICT (provider, "providerAccountId")
-      DO UPDATE SET
-        "userId" = EXCLUDED."userId",
-        id_token = EXCLUDED.id_token
-    `,
-    [userId, providerAccountId, idToken]
-  );
-
-  const sessionToken = crypto.randomUUID();
-  const expires = new Date(Date.now() + SESSION_TTL_MS);
-  await pool.query(
-    `
-      INSERT INTO sessions ("sessionToken", "userId", expires)
-      VALUES ($1, $2, $3)
-    `,
-    [sessionToken, userId, expires]
-  );
-
-  return Response.json({
-    token: sessionToken,
-    user: {
-      id: userId,
-      name,
-      email,
-      image,
-    },
-    expires: expires.toISOString(),
-  });
 }
