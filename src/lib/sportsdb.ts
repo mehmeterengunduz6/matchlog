@@ -78,7 +78,13 @@ async function fetchLeagueEvents(date: string, league: LeagueConfig) {
   const url = `${BASE_URL}/eventsday.php?d=${date}&l=${encodeURIComponent(
     league.query
   )}&s=Soccer`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
+
+  // For today's date, use much shorter cache (30 seconds) for live scores
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = date === today;
+  const revalidateTime = isToday ? 30 : 300;
+
+  const res = await fetch(url, { next: { revalidate: revalidateTime } });
   if (!res.ok) {
     throw new Error(`TheSportsDB error: ${res.status}`);
   }
@@ -89,6 +95,11 @@ async function fetchLeagueEvents(date: string, league: LeagueConfig) {
 }
 
 export async function fetchEventsByDate(date: string) {
+  // For today's date, use shorter cache (30 seconds) for live scores
+  const today = new Date().toISOString().split('T')[0];
+  const isToday = date === today;
+  const ttl = isToday ? 30 * 1000 : CACHE_TTL_MS; // 30 seconds for today, 5 minutes for other dates
+
   const cached = cache.get(date);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data;
@@ -99,6 +110,6 @@ export async function fetchEventsByDate(date: string) {
   );
   const events = eventsByLeague.flat();
 
-  cache.set(date, { expiresAt: Date.now() + CACHE_TTL_MS, data: events });
+  cache.set(date, { expiresAt: Date.now() + ttl, data: events });
   return events;
 }
