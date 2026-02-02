@@ -13,10 +13,10 @@ async function runMigration() {
   });
 
   try {
-    const migrationPath = path.join(__dirname, '../../db/migrations/001_add_user_preferences.sql');
+    const migrationPath = path.join(__dirname, '../db/migrations/002_add_notified_events.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
-    console.log('Running migration: 001_add_user_preferences.sql');
+    console.log('Running migration: 002_add_notified_events.sql');
     await pool.query(sql);
     console.log('Migration completed successfully!');
   } catch (error) {

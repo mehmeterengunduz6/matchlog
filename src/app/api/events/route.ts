@@ -1,5 +1,9 @@
 import { fetchEventsByDate, FEATURED_LEAGUES } from "@/lib/sportsdb";
-import { getWatchedStats, listWatchedEventIds } from "@/lib/db";
+import {
+  getWatchedStats,
+  listWatchedEventIds,
+  listNotifiedEventIds,
+} from "@/lib/db";
 import { getUserIdFromRequest } from "@/lib/mobile-auth";
 
 export const dynamic = "force-dynamic";
@@ -55,8 +59,11 @@ export async function GET(request: Request) {
 
   const events = await fetchEventsByDate(date);
   const leagues = groupByLeague(events, leagueOrder);
-  const watchedIds = await listWatchedEventIds(userId, date);
-  const stats = await getWatchedStats(userId);
+  const [watchedIds, notifiedIds, stats] = await Promise.all([
+    listWatchedEventIds(userId, date),
+    listNotifiedEventIds(userId, date),
+    getWatchedStats(userId),
+  ]);
 
-  return Response.json({ date, leagues, watchedIds, stats });
+  return Response.json({ date, leagues, watchedIds, notifiedIds, stats });
 }

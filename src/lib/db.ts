@@ -28,6 +28,20 @@ export type WatchedEvent = {
   createdAt: string;
 };
 
+export type NotifiedEvent = {
+  id: number;
+  userId: string;
+  eventId: string;
+  leagueId: string;
+  leagueName: string;
+  date: string;
+  time: string;
+  homeTeam: string;
+  awayTeam: string;
+  notificationId: string | null;
+  createdAt: string;
+};
+
 function formatDate(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -349,4 +363,125 @@ export async function updateUserPreferences(
     [userId, JSON.stringify(preferences)]
   );
   return result.rows[0] as UserPreferencesRecord;
+}
+
+export async function listNotifiedEventIds(userId: string, date: string) {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      SELECT event_id as "eventId"
+      FROM notified_events
+      WHERE user_id = $1 AND date = $2
+    `,
+    [userId, date]
+  );
+  return result.rows.map((row: { eventId: string }) => row.eventId);
+}
+
+export async function addNotifiedEvent(
+  userId: string,
+  input: Omit<NotifiedEvent, "id" | "createdAt" | "userId">
+) {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      INSERT INTO notified_events
+        (user_id, event_id, league_id, league_name, date, time, home_team, away_team, notification_id)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ON CONFLICT (user_id, event_id)
+      DO UPDATE SET
+        league_id = EXCLUDED.league_id,
+        league_name = EXCLUDED.league_name,
+        date = EXCLUDED.date,
+        time = EXCLUDED.time,
+        home_team = EXCLUDED.home_team,
+        away_team = EXCLUDED.away_team,
+        notification_id = EXCLUDED.notification_id
+      RETURNING
+        id,
+        user_id as "userId",
+        event_id as "eventId",
+        league_id as "leagueId",
+        league_name as "leagueName",
+        date,
+        time,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        notification_id as "notificationId",
+        created_at as "createdAt"
+    `,
+    [
+      userId,
+      input.eventId,
+      input.leagueId,
+      input.leagueName,
+      input.date,
+      input.time,
+      input.homeTeam,
+      input.awayTeam,
+      input.notificationId,
+    ]
+  );
+  return result.rows[0] as NotifiedEvent;
+}
+
+export async function removeNotifiedEvent(userId: string, eventId: string) {
+  const pool = getPool();
+  await pool.query(
+    `DELETE FROM notified_events WHERE user_id = $1 AND event_id = $2`,
+    [userId, eventId]
+  );
+}
+
+export async function getNotifiedEvent(
+  userId: string,
+  eventId: string
+): Promise<NotifiedEvent | null> {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        user_id as "userId",
+        event_id as "eventId",
+        league_id as "leagueId",
+        league_name as "leagueName",
+        date,
+        time,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        notification_id as "notificationId",
+        created_at as "createdAt"
+      FROM notified_events
+      WHERE user_id = $1 AND event_id = $2
+    `,
+    [userId, eventId]
+  );
+  return (result.rows[0] as NotifiedEvent) ?? null;
+}
+
+export async function listNotifiedEvents(userId: string) {
+  const pool = getPool();
+  const result = await pool.query(
+    `
+      SELECT
+        id,
+        user_id as "userId",
+        event_id as "eventId",
+        league_id as "leagueId",
+        league_name as "leagueName",
+        date,
+        time,
+        home_team as "homeTeam",
+        away_team as "awayTeam",
+        notification_id as "notificationId",
+        created_at as "createdAt"
+      FROM notified_events
+      WHERE user_id = $1
+      ORDER BY date ASC, time ASC, id ASC
+    `,
+    [userId]
+  );
+  return result.rows as NotifiedEvent[];
 }
