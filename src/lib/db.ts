@@ -302,6 +302,7 @@ export type UserPreferences = {
   collapsedLeagues?: string[];
   hiddenLeagues?: string[];
   leagueOrder?: string[];
+  favoriteTeams?: string[];
 };
 
 export type UserPreferencesRecord = {
