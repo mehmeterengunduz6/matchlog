@@ -1,4 +1,4 @@
-CREATE TABLE notified_events (
+CREATE TABLE IF NOT EXISTS notified_events (
   id serial PRIMARY KEY,
   user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   event_id text NOT NULL,
@@ -13,5 +13,5 @@ CREATE TABLE notified_events (
   CONSTRAINT unique_user_event UNIQUE (user_id, event_id)
 );
 
-CREATE INDEX idx_notified_events_user_id ON notified_events(user_id);
-CREATE INDEX idx_notified_events_date ON notified_events(date);
+CREATE INDEX IF NOT EXISTS idx_notified_events_user_id ON notified_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_notified_events_date ON notified_events(date);

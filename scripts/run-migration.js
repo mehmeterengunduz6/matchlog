@@ -13,12 +13,21 @@ async function runMigration() {
   });
 
   try {
-    const migrationPath = path.join(__dirname, '../db/migrations/002_add_notified_events.sql');
-    const sql = fs.readFileSync(migrationPath, 'utf8');
+    const migrationsDir = path.join(__dirname, '../db/migrations');
+    const migrationFiles = fs.readdirSync(migrationsDir)
+      .filter(file => file.endsWith('.sql'))
+      .sort(); // Sort to ensure migrations run in order
 
-    console.log('Running migration: 002_add_notified_events.sql');
-    await pool.query(sql);
-    console.log('Migration completed successfully!');
+    for (const file of migrationFiles) {
+      const migrationPath = path.join(migrationsDir, file);
+      const sql = fs.readFileSync(migrationPath, 'utf8');
+
+      console.log(`Running migration: ${file}`);
+      await pool.query(sql);
+      console.log(`✓ ${file} completed successfully`);
+    }
+
+    console.log('\nAll migrations completed successfully!');
   } catch (error) {
     console.error('Migration failed:', error);
     process.exit(1);
