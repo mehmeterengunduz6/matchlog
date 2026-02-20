@@ -5,6 +5,8 @@ type SportsDbEvent = {
   strEvent: string | null;
   strHomeTeam: string | null;
   strAwayTeam: string | null;
+  idHomeTeam?: string;
+  idAwayTeam?: string;
   intHomeScore: string | null;
   intAwayScore: string | null;
   dateEvent: string | null;
@@ -31,6 +33,8 @@ export type NormalizedEvent = {
   time: string;
   homeTeam: string;
   awayTeam: string;
+  homeTeamId?: string;
+  awayTeamId?: string;
   homeScore: number | null;
   awayScore: number | null;
 };
@@ -67,6 +71,8 @@ function normalizeEvent(
     time: event.strTime ?? "",
     homeTeam: event.strHomeTeam ?? "TBD",
     awayTeam: event.strAwayTeam ?? "TBD",
+    homeTeamId: event.idHomeTeam,
+    awayTeamId: event.idAwayTeam,
     homeScore:
       event.intHomeScore === null ? null : Number(event.intHomeScore),
     awayScore:
@@ -180,4 +186,53 @@ export function getAllTeams(): TeamsByLeague[] {
     leagueBadge: league.badge,
     teams: FEATURED_TEAMS[league.id] || [],
   })).filter((league) => league.teams.length > 0);
+}
+
+export async function fetchTeamMatches(teamId: string) {
+  const cacheKey = `team:${teamId}`;
+  const cached = cache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data as { pastMatches: NormalizedEvent[]; upcomingMatches: NormalizedEvent[] };
+  }
+
+  const [pastRes, upcomingRes] = await Promise.all([
+    fetch(`${BASE_URL}/eventslast.php?id=${teamId}`, {
+      next: { revalidate: 300 }
+    }),
+    fetch(`${BASE_URL}/eventsnext.php?id=${teamId}`, {
+      next: { revalidate: 300 }
+    })
+  ]);
+
+  if (!pastRes.ok || !upcomingRes.ok) {
+    throw new Error(`TheSportsDB error: ${pastRes.status} / ${upcomingRes.status}`);
+  }
+
+  const pastData = (await pastRes.json()) as SportsDbResponse & { results?: SportsDbEvent[] };
+  const upcomingData = (await upcomingRes.json()) as SportsDbResponse;
+
+  // Find league config for badge (use first event's league or default)
+  const findLeagueConfig = (events: SportsDbEvent[] | null | undefined): LeagueConfig => {
+    if (!events || events.length === 0) return FEATURED_LEAGUES[0];
+    const leagueId = events[0].idLeague;
+    return FEATURED_LEAGUES.find(l => l.id === leagueId) || FEATURED_LEAGUES[0];
+  };
+
+  const pastEvents = pastData.results || pastData.events || [];
+  const upcomingEvents = upcomingData.events || [];
+
+  const pastLeague = findLeagueConfig(pastEvents);
+  const upcomingLeague = findLeagueConfig(upcomingEvents);
+
+  const pastMatches = pastEvents
+    .map(e => normalizeEvent(e, pastLeague))
+    .filter((e): e is NormalizedEvent => Boolean(e));
+
+  const upcomingMatches = upcomingEvents
+    .map(e => normalizeEvent(e, upcomingLeague))
+    .filter((e): e is NormalizedEvent => Boolean(e));
+
+  const result = { pastMatches, upcomingMatches };
+  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: result });
+  return result;
 }

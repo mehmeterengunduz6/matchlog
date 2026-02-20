@@ -485,3 +485,35 @@ export async function listNotifiedEvents(userId: string) {
   );
   return result.rows as NotifiedEvent[];
 }
+
+export async function listWatchedEventIdsByEventIds(
+  userId: string,
+  eventIds: string[]
+): Promise<string[]> {
+  if (eventIds.length === 0) return [];
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT event_id as "eventId"
+     FROM watched_events
+     WHERE user_id = $1 AND event_id = ANY($2)`,
+    [userId, eventIds]
+  );
+  return result.rows.map((row: { eventId: string }) => row.eventId);
+}
+
+export async function listNotifiedEventIdsByEventIds(
+  userId: string,
+  eventIds: string[]
+): Promise<string[]> {
+  if (eventIds.length === 0) return [];
+
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT event_id as "eventId"
+     FROM notified_events
+     WHERE user_id = $1 AND event_id = ANY($2)`,
+    [userId, eventIds]
+  );
+  return result.rows.map((row: { eventId: string }) => row.eventId);
+}
