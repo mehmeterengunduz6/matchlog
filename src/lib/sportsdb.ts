@@ -53,6 +53,7 @@ export const FEATURED_LEAGUES: LeagueConfig[] = [
 ];
 
 const cache = new Map<string, { expiresAt: number; data: NormalizedEvent[] }>();
+const teamCache = new Map<string, { expiresAt: number; data: { pastMatches: NormalizedEvent[]; upcomingMatches: NormalizedEvent[] } }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 function normalizeEvent(
@@ -190,9 +191,9 @@ export function getAllTeams(): TeamsByLeague[] {
 
 export async function fetchTeamMatches(teamId: string) {
   const cacheKey = `team:${teamId}`;
-  const cached = cache.get(cacheKey);
+  const cached = teamCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return cached.data as unknown as { pastMatches: NormalizedEvent[]; upcomingMatches: NormalizedEvent[] };
+    return cached.data;
   }
 
   const [pastRes, upcomingRes] = await Promise.all([
@@ -233,6 +234,6 @@ export async function fetchTeamMatches(teamId: string) {
     .filter((e): e is NormalizedEvent => Boolean(e));
 
   const result = { pastMatches, upcomingMatches };
-  cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: result });
+  teamCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, data: result });
   return result;
 }
