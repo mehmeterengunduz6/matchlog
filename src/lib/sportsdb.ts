@@ -192,7 +192,7 @@ export async function fetchTeamMatches(teamId: string) {
   const cacheKey = `team:${teamId}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
-    return cached.data as { pastMatches: NormalizedEvent[]; upcomingMatches: NormalizedEvent[] };
+    return cached.data as unknown as { pastMatches: NormalizedEvent[]; upcomingMatches: NormalizedEvent[] };
   }
 
   const [pastRes, upcomingRes] = await Promise.all([
